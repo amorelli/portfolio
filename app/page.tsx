@@ -7,11 +7,7 @@ export default function Page() {
         Adam Morelli
       </h1>
       <p className="mb-4">
-        {`I'm a Vim enthusiast and tab advocate, finding unmatched efficiency in
-        Vim's keystroke commands and tabs' flexibility for personal viewing
-        preferences. This extends to my support for static typing, where its
-        early error detection ensures cleaner code, and my preference for dark
-        mode, which eases long coding sessions by reducing eye strain.`}
+        {`Hi, I'm Adam, and this is my site. I work as a web developer, primarily using React, Laravel, MySQL, GraphQL, and AWS.`}
       </p>
       <div className="my-8">
         <BlogPosts />
