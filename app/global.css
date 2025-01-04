@@ -31,6 +31,10 @@
 
 html {
   min-width: 360px;
+  background-image: url('../public/skull.webp');
+  /* background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center; */
 }
 
 .prose .anchor {
