@@ -161,3 +161,8 @@ table {
 .title {
   text-wrap: balance;
 }
+
+/* Custom grid classes for 20x20 grid */
+.grid-cols-20 {
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+}
