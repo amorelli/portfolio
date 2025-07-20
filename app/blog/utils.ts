@@ -11,17 +11,45 @@ type Metadata = {
 function parseFrontmatter(fileContent: string) {
   let frontmatterRegex = /---\s*([\s\S]*?)\s*---/
   let match = frontmatterRegex.exec(fileContent)
-  let frontMatterBlock = match![1]
+  
+  if (!match) {
+    throw new Error('No frontmatter found in the file')
+  }
+  
+  let frontMatterBlock = match[1]
   let content = fileContent.replace(frontmatterRegex, '').trim()
   let frontMatterLines = frontMatterBlock.trim().split('\n')
   let metadata: Partial<Metadata> = {}
 
+  let currentKey = ''
+  let currentValue = ''
+
   frontMatterLines.forEach((line) => {
-    let [key, ...valueArr] = line.split(': ')
-    let value = valueArr.join(': ').trim()
-    value = value.replace(/^['"](.*)['"]$/, '$1') // Remove quotes
-    metadata[key.trim() as keyof Metadata] = value
+    line = line.trim()
+    
+    // Check if this line starts a new key-value pair
+    if (line.includes(':') && !line.startsWith(' ') && !line.startsWith('\t')) {
+      // Save previous key-value if exists
+      if (currentKey) {
+        let cleanValue = currentValue.trim().replace(/^['"](.*)['"]$/, '$1')
+        metadata[currentKey as keyof Metadata] = cleanValue
+      }
+      
+      // Start new key-value pair
+      let [key, ...valueArr] = line.split(':')
+      currentKey = key.trim()
+      currentValue = valueArr.join(':').trim()
+    } else if (currentKey && line) {
+      // This is a continuation of the current value (multi-line)
+      currentValue += ' ' + line.replace(/^['"](.*)['"]$/, '$1')
+    }
   })
+
+  // Don't forget the last key-value pair
+  if (currentKey) {
+    let cleanValue = currentValue.trim().replace(/^['"](.*)['"]$/, '$1')
+    metadata[currentKey as keyof Metadata] = cleanValue
+  }
 
   return { metadata: metadata as Metadata, content }
 }
@@ -32,21 +60,41 @@ function getMDXFiles(dir) {
 
 function readMDXFile(filePath) {
   let rawContent = fs.readFileSync(filePath, 'utf-8')
-  return parseFrontmatter(rawContent)
+  
+  // Skip empty files or files without frontmatter
+  if (!rawContent.trim() || !rawContent.includes('---')) {
+    return null
+  }
+  
+  try {
+    return parseFrontmatter(rawContent)
+  } catch (error) {
+    console.warn(`Warning: Could not parse frontmatter in ${filePath}:`, error.message)
+    return null
+  }
 }
 
 function getMDXData(dir) {
   let mdxFiles = getMDXFiles(dir)
-  return mdxFiles.map((file) => {
-    let { metadata, content } = readMDXFile(path.join(dir, file))
-    let slug = path.basename(file, path.extname(file))
+  return mdxFiles
+    .map((file) => {
+      let result = readMDXFile(path.join(dir, file))
+      
+      // Skip files that couldn't be parsed
+      if (!result) {
+        return null
+      }
+      
+      let { metadata, content } = result
+      let slug = path.basename(file, path.extname(file))
 
-    return {
-      metadata,
-      slug,
-      content,
-    }
-  })
+      return {
+        metadata,
+        slug,
+        content,
+      }
+    })
+    .filter(Boolean) // Remove null entries
 }
 
 export function getBlogPosts() {
