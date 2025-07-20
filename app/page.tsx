@@ -8,7 +8,7 @@ export default function Page() {
       </h1> */}
       {/* <img src='skull.webp' alt="Skull Gif" /> */}
       {/* <img src='spagh.png' alt="Spaghetti" /> */}
-      <p className="mb-4">
+      <p className="mb-4 text-neutral-700 dark:text-neutral-300">
         {`This site is used for experimentation and testing.`}
       </p>
       <div className="my-8">
