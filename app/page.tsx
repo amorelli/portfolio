@@ -1,6 +1,4 @@
 import { BlogPosts } from 'app/components/posts'
-import skullWebp from './images/skull.webp'
-import spaghetti from './images/spagh.png'
 
 export default function Page() {
   return (

@@ -1,4 +1,6 @@
-@import 'tailwindcss';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 ::selection {
   background-color: #47a3f3;
@@ -59,20 +61,34 @@ body {
 }
 
 .prose a {
-  @apply underline transition-all decoration-neutral-400 dark:decoration-neutral-600 underline-offset-2 decoration-[0.1em];
+  @apply underline transition-all underline-offset-2;
+  text-decoration-color: #a3a3a3;
+  text-decoration-thickness: 0.1em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .prose a {
+    text-decoration-color: #525252;
+  }
 }
 
 .prose .anchor:after {
-  @apply text-neutral-300 dark:text-neutral-700;
+  color: #d1d5db;
   content: '#';
+}
+
+@media (prefers-color-scheme: dark) {
+  .prose .anchor:after {
+    color: #374151;
+  }
 }
 
 .prose *:hover > .anchor {
   @apply visible;
 }
 
-.prose pre {  
-  @apply bg-neutral-50 dark:bg-neutral-900 rounded-lg overflow-x-auto border border-neutral-200 dark:border-neutral-900 py-2 px-3 text-sm;
+.prose pre {
+  @apply bg-gray-50 dark:bg-gray-900 rounded-lg overflow-x-auto border border-gray-200 dark:border-gray-900 py-2 px-3 text-sm;
   background-color: #000;
 }
 
