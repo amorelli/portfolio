@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Interactive Color Grid | Adam',
-  description: 'A 20x20 interactive grid where clicking squares fills them with random colors. Data is stored in a SQLite database.',
+  description: 'A 20x20 interactive grid where clicking squares fills them with random colors. Data is stored in Vercel blob storage.',
   openGraph: {
     title: 'Interactive Color Grid',
     description: 'Click squares to fill them with random colors',
