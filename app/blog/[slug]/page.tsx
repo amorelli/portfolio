@@ -7,11 +7,11 @@ export async function generateStaticParams() {
   let posts = getBlogPosts()
 
   return posts.map((post) => ({
-    slug: post.slug,
-  }))
+    slug: post?.slug,
+  })).filter(item => item.slug) // Filter out any undefined slugs
 }
 
-export function generateMetadata({ params }) {
+export function generateMetadata({ params }: { params: { slug: string } }) {
   let post = getBlogPosts().find((post) => post.slug === params.slug)
   if (!post) {
     return
@@ -51,7 +51,7 @@ export function generateMetadata({ params }) {
   }
 }
 
-export default function Blog({ params }) {
+export default function Blog({ params }: { params: { slug: string } }) {
   let post = getBlogPosts().find((post) => post.slug === params.slug)
 
   if (!post) {

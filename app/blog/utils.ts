@@ -54,11 +54,11 @@ function parseFrontmatter(fileContent: string) {
   return { metadata: metadata as Metadata, content }
 }
 
-function getMDXFiles(dir) {
+function getMDXFiles(dir: string): string[] {
   return fs.readdirSync(dir).filter((file) => path.extname(file) === '.mdx')
 }
 
-function readMDXFile(filePath) {
+function readMDXFile(filePath: string) {
   let rawContent = fs.readFileSync(filePath, 'utf-8')
   
   // Skip empty files or files without frontmatter
@@ -74,7 +74,7 @@ function readMDXFile(filePath) {
   }
 }
 
-function getMDXData(dir) {
+function getMDXData(dir: string) {
   let mdxFiles = getMDXFiles(dir)
   return mdxFiles
     .map((file) => {
@@ -94,7 +94,11 @@ function getMDXData(dir) {
         content,
       }
     })
-    .filter(Boolean) // Remove null entries
+    .filter(Boolean) as Array<{
+      metadata: Metadata,
+      slug: string,
+      content: string
+    }> // Remove null entries and assert type
 }
 
 export function getBlogPosts() {
