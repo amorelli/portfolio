@@ -1,0 +1,552 @@
+---
+title: "Modern JavaScript Async Patterns: From Callbacks to Async/Await"
+publishedAt: "2025-05-11"
+summary: "Explore the evolution of asynchronous JavaScript patterns and learn when to use Promises, async/await, and advanced techniques like Promise combinators"
+---
+
+## Introduction
+
+Asynchronous programming is at the heart of modern JavaScript. Whether you're fetching data from APIs, reading files, or handling user interactions, understanding async patterns is crucial for building responsive applications.
+
+JavaScript has evolved significantly in how we handle asynchronous operations—from callback hell to elegant async/await syntax. Let's explore these patterns and learn when to use each one.
+
+## The Evolution of Async JavaScript
+
+### 1. Callbacks: The Beginning
+
+Callbacks were the original way to handle async operations, but they quickly led to "callback hell":
+
+```javascript
+// Callback Hell - Hard to read and maintain
+function getUserData(userId, callback) {
+  fetchUser(userId, (err, user) => {
+    if (err) {
+      callback(err, null);
+      return;
+    }
+    
+    fetchUserPosts(user.id, (err, posts) => {
+      if (err) {
+        callback(err, null);
+        return;
+      }
+      
+      fetchPostComments(posts[0].id, (err, comments) => {
+        if (err) {
+          callback(err, null);
+          return;
+        }
+        
+        callback(null, { user, posts, comments });
+      });
+    });
+  });
+}
+```
+
+### 2. Promises: A Better Way
+
+Promises introduced a cleaner, more composable approach:
+
+```javascript
+// Much cleaner with Promises
+function getUserData(userId) {
+  return fetchUser(userId)
+    .then(user => {
+      return Promise.all([
+        user,
+        fetchUserPosts(user.id),
+      ]);
+    })
+    .then(([user, posts]) => {
+      return Promise.all([
+        user,
+        posts,
+        fetchPostComments(posts[0].id)
+      ]);
+    })
+    .then(([user, posts, comments]) => {
+      return { user, posts, comments };
+    })
+    .catch(error => {
+      console.error('Error fetching user data:', error);
+      throw error;
+    });
+}
+```
+
+### 3. Async/Await: The Modern Standard
+
+Async/await makes asynchronous code look synchronous:
+
+```javascript
+// Clean and readable with async/await
+async function getUserData(userId) {
+  try {
+    const user = await fetchUser(userId);
+    const posts = await fetchUserPosts(user.id);
+    const comments = await fetchPostComments(posts[0].id);
+    
+    return { user, posts, comments };
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    throw error;
+  }
+}
+```
+
+## Promise Fundamentals
+
+### Creating Promises
+
+```javascript
+// Basic Promise creation
+const delay = (ms) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      resolve(`Completed after ${ms}ms`);
+    }, ms);
+  });
+};
+
+// Using the Promise
+delay(1000)
+  .then(message => console.log(message))
+  .catch(error => console.error(error));
+```
+
+### Promise States
+
+A Promise can be in one of three states:
+
+```javascript
+// Demonstrating Promise states
+function checkPromiseState() {
+  const pendingPromise = new Promise((resolve) => {
+    // This promise is pending
+    setTimeout(() => resolve('resolved!'), 1000);
+  });
+  
+  const resolvedPromise = Promise.resolve('Already resolved');
+  const rejectedPromise = Promise.reject(new Error('Something went wrong'));
+  
+  return {
+    pending: pendingPromise,      // State: pending
+    resolved: resolvedPromise,    // State: fulfilled
+    rejected: rejectedPromise     // State: rejected
+  };
+}
+```
+
+## Advanced Async Patterns
+
+### 1. Promise Combinators
+
+#### Promise.all() - Wait for All
+
+```javascript
+// Execute multiple async operations in parallel
+async function fetchUserDashboard(userId) {
+  try {
+    const [user, posts, notifications, friends] = await Promise.all([
+      fetchUser(userId),
+      fetchUserPosts(userId),
+      fetchNotifications(userId),
+      fetchFriends(userId)
+    ]);
+    
+    return { user, posts, notifications, friends };
+  } catch (error) {
+    // If any promise rejects, this catch block runs
+    console.error('Dashboard fetch failed:', error);
+    throw error;
+  }
+}
+```
+
+#### Promise.allSettled() - Wait for All, Handle Failures
+
+```javascript
+// Get results from all promises, regardless of success/failure
+async function fetchUserDataSafely(userId) {
+  const results = await Promise.allSettled([
+    fetchUser(userId),
+    fetchUserPosts(userId),
+    fetchNotifications(userId),
+    fetchFriends(userId)
+  ]);
+  
+  const dashboard = {
+    user: null,
+    posts: [],
+    notifications: [],
+    friends: []
+  };
+  
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      switch (index) {
+        case 0: dashboard.user = result.value; break;
+        case 1: dashboard.posts = result.value; break;
+        case 2: dashboard.notifications = result.value; break;
+        case 3: dashboard.friends = result.value; break;
+      }
+    } else {
+      console.warn(`Operation ${index} failed:`, result.reason);
+    }
+  });
+  
+  return dashboard;
+}
+```
+
+#### Promise.race() - First to Complete Wins
+
+```javascript
+// Useful for timeouts and fastest response
+async function fetchWithTimeout(url, timeoutMs = 5000) {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error('Request timed out'));
+    }, timeoutMs);
+  });
+  
+  try {
+    const response = await Promise.race([
+      fetch(url),
+      timeoutPromise
+    ]);
+    
+    return response.json();
+  } catch (error) {
+    if (error.message === 'Request timed out') {
+      console.error('Request took too long');
+    }
+    throw error;
+  }
+}
+```
+
+### 2. Sequential vs Parallel Execution
+
+```javascript
+// Sequential execution - slower but sometimes necessary
+async function processItemsSequentially(items) {
+  const results = [];
+  
+  for (const item of items) {
+    const result = await processItem(item);
+    results.push(result);
+  }
+  
+  return results;
+}
+
+// Parallel execution - faster when order doesn't matter
+async function processItemsInParallel(items) {
+  const promises = items.map(item => processItem(item));
+  return Promise.all(promises);
+}
+
+// Controlled concurrency - limit simultaneous operations
+async function processItemsWithLimit(items, limit = 3) {
+  const results = [];
+  
+  for (let i = 0; i < items.length; i += limit) {
+    const batch = items.slice(i, i + limit);
+    const batchPromises = batch.map(item => processItem(item));
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+  }
+  
+  return results;
+}
+```
+
+## Error Handling Strategies
+
+### 1. Global Error Handling
+
+```javascript
+// Catch unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+  
+  // Prevent the default behavior (logging to console)
+  event.preventDefault();
+  
+  // Report to error tracking service
+  reportError(event.reason);
+});
+```
+
+### 2. Retry Mechanisms
+
+```javascript
+async function fetchWithRetry(url, maxRetries = 3, delayMs = 1000) {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      console.warn(`Attempt ${attempt} failed, retrying in ${delayMs}ms...`);
+      await delay(delayMs);
+      
+      // Exponential backoff
+      delayMs *= 2;
+    }
+  }
+}
+
+// Helper function for delays
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+```
+
+### 3. Circuit Breaker Pattern
+
+```javascript
+class CircuitBreaker {
+  constructor(threshold = 5, timeout = 60000) {
+    this.threshold = threshold;
+    this.timeout = timeout;
+    this.failures = 0;
+    this.lastFailureTime = null;
+    this.state = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
+  }
+  
+  async execute(asyncFunction) {
+    if (this.state === 'OPEN') {
+      if (Date.now() - this.lastFailureTime > this.timeout) {
+        this.state = 'HALF_OPEN';
+      } else {
+        throw new Error('Circuit breaker is OPEN');
+      }
+    }
+    
+    try {
+      const result = await asyncFunction();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+  
+  onSuccess() {
+    this.failures = 0;
+    this.state = 'CLOSED';
+  }
+  
+  onFailure() {
+    this.failures++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.failures >= this.threshold) {
+      this.state = 'OPEN';
+    }
+  }
+}
+
+// Usage
+const breaker = new CircuitBreaker(3, 30000);
+
+async function callExternalAPI() {
+  return breaker.execute(() => fetch('/api/external-service'));
+}
+```
+
+## Async Generators and Streams
+
+### 1. Async Generators
+
+```javascript
+// Async generator for paginated data
+async function* fetchAllPages(baseUrl) {
+  let page = 1;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const response = await fetch(`${baseUrl}?page=${page}`);
+    const data = await response.json();
+    
+    yield data.items;
+    
+    hasMore = data.hasMore;
+    page++;
+  }
+}
+
+// Usage
+async function processAllData() {
+  for await (const pageData of fetchAllPages('/api/data')) {
+    console.log(`Processing ${pageData.length} items`);
+    // Process each page as it arrives
+  }
+}
+```
+
+### 2. Async Iteration
+
+```javascript
+// Custom async iterator
+class AsyncRange {
+  constructor(start, end, delay = 100) {
+    this.start = start;
+    this.end = end;
+    this.delay = delay;
+  }
+  
+  [Symbol.asyncIterator]() {
+    let current = this.start;
+    const end = this.end;
+    const delay = this.delay;
+    
+    return {
+      async next() {
+        if (current <= end) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return { value: current++, done: false };
+        } else {
+          return { done: true };
+        }
+      }
+    };
+  }
+}
+
+// Usage
+async function example() {
+  for await (const num of new AsyncRange(1, 5, 500)) {
+    console.log(num); // 1, 2, 3, 4, 5 (with 500ms delays)
+  }
+}
+```
+
+## Modern Best Practices
+
+### 1. Prefer Async/Await Over .then()
+
+```javascript
+// ❌ Avoid - mixing promises and async/await
+async function badExample() {
+  return fetchUser()
+    .then(user => {
+      return fetchPosts(user.id);
+    });
+}
+
+// ✅ Good - consistent async/await
+async function goodExample() {
+  const user = await fetchUser();
+  return fetchPosts(user.id);
+}
+```
+
+### 2. Handle Errors Appropriately
+
+```javascript
+// ✅ Good - specific error handling
+async function fetchUserSafely(userId) {
+  try {
+    const user = await fetchUser(userId);
+    return user;
+  } catch (error) {
+    if (error.status === 404) {
+      return null; // User not found
+    } else if (error.status === 403) {
+      throw new Error('Access denied');
+    } else {
+      // Log unexpected errors
+      console.error('Unexpected error fetching user:', error);
+      throw error;
+    }
+  }
+}
+```
+
+### 3. Use AbortController for Cancellation
+
+```javascript
+async function fetchWithCancellation(url) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    return response.json();
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('Request was cancelled');
+    }
+    throw error;
+  }
+}
+```
+
+## Performance Considerations
+
+### 1. Avoid Creating Unnecessary Promises
+
+```javascript
+// ❌ Avoid - unnecessary Promise creation
+async function bad(value) {
+  return Promise.resolve(value);
+}
+
+// ✅ Good - return value directly
+async function good(value) {
+  return value;
+}
+```
+
+### 2. Use Promise.all() for Independent Operations
+
+```javascript
+// ❌ Slow - sequential execution
+async function slowVersion() {
+  const user = await fetchUser();
+  const posts = await fetchPosts();
+  const comments = await fetchComments();
+  return { user, posts, comments };
+}
+
+// ✅ Fast - parallel execution
+async function fastVersion() {
+  const [user, posts, comments] = await Promise.all([
+    fetchUser(),
+    fetchPosts(),
+    fetchComments()
+  ]);
+  return { user, posts, comments };
+}
+```
+
+## Conclusion
+
+Modern JavaScript async patterns provide powerful tools for handling asynchronous operations elegantly. The key takeaways are:
+
+1. **Use async/await** for cleaner, more readable code
+2. **Choose the right Promise combinator** for your use case
+3. **Handle errors appropriately** with try/catch and proper error types
+4. **Consider performance** - use parallel execution when possible
+5. **Implement retry logic** for resilient applications
+
+Mastering these patterns will make your JavaScript applications more robust, maintainable, and performant. The async ecosystem continues to evolve, but these fundamentals will serve you well in any JavaScript environment.

@@ -11,7 +11,7 @@ export default function Page() {
       {/* <img src='skull.webp' alt="Skull Gif" /> */}
       {/* <img src='spagh.png' alt="Spaghetti" /> */}
       <p className="mb-4">
-        {`I work as a web developer, primarily using React, Laravel, MySQL, GraphQL, and AWS.`}
+        {`This site is used for experimentation and testing.`}
       </p>
       <div className="my-8">
         <BlogPosts />

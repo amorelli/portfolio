@@ -1,0 +1,1212 @@
+---
+title: "Building Accessible Web Components: A Practical Guide"
+publishedAt: "2025-04-23"
+summary: "Learn how to create truly accessible web components using semantic HTML, ARIA attributes, and modern JavaScript techniques with practical examples and testing strategies"
+---
+
+## Introduction
+
+Accessibility isn't an afterthought—it's a fundamental aspect of web development that ensures your applications work for everyone, including users with disabilities. Building accessible web components requires understanding semantic HTML, ARIA attributes, keyboard navigation, and assistive technology compatibility.
+
+This guide provides practical techniques and real-world examples for creating accessible components that provide an excellent user experience for all users.
+
+## Foundations of Accessible Components
+
+### Semantic HTML First
+
+Always start with semantic HTML before adding custom behavior. Semantic elements provide built-in accessibility features.
+
+```html
+<!-- ❌ Poor: Non-semantic markup -->
+<div class="button" onclick="submit()">Submit</div>
+<div class="heading">Page Title</div>
+<div class="input-container">
+  <span>Email</span>
+  <div contenteditable="true"></div>
+</div>
+
+<!-- ✅ Good: Semantic markup -->
+<button type="submit" onclick="submit()">Submit</button>
+<h1>Page Title</h1>
+<label for="email">
+  Email
+  <input type="email" id="email" name="email" required>
+</label>
+```
+
+### ARIA Attributes
+
+ARIA (Accessible Rich Internet Applications) attributes enhance semantic meaning when HTML alone isn't sufficient.
+
+```javascript
+// Accessible toggle button component
+class ToggleButton extends HTMLElement {
+  constructor() {
+    super();
+    this.pressed = false;
+    this.render();
+    this.addEventListeners();
+  }
+
+  render() {
+    this.innerHTML = `
+      <button 
+        type="button"
+        aria-pressed="${this.pressed}"
+        class="toggle-button ${this.pressed ? 'pressed' : ''}"
+      >
+        <span class="toggle-text">
+          ${this.pressed ? 'On' : 'Off'}
+        </span>
+        <span class="toggle-indicator" aria-hidden="true"></span>
+      </button>
+    `;
+  }
+
+  addEventListeners() {
+    const button = this.querySelector('button');
+    
+    button.addEventListener('click', () => {
+      this.toggle();
+    });
+    
+    // Support Enter and Space keys
+    button.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.toggle();
+      }
+    });
+  }
+
+  toggle() {
+    this.pressed = !this.pressed;
+    this.render();
+    
+    // Dispatch custom event for external listeners
+    this.dispatchEvent(new CustomEvent('toggle', {
+      detail: { pressed: this.pressed },
+      bubbles: true
+    }));
+  }
+
+  // Getter for external access
+  get isPressed() {
+    return this.pressed;
+  }
+}
+
+customElements.define('toggle-button', ToggleButton);
+```
+
+```css
+/* Accessible styling for toggle button */
+.toggle-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid #333;
+  background: white;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-button:focus {
+  outline: 3px solid #005fcc;
+  outline-offset: 2px;
+}
+
+.toggle-button.pressed {
+  background: #005fcc;
+  color: white;
+  border-color: #005fcc;
+}
+
+.toggle-indicator {
+  width: 20px;
+  height: 20px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  position: relative;
+}
+
+.pressed .toggle-indicator::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .toggle-button {
+    border-width: 3px;
+  }
+  
+  .toggle-button:focus {
+    outline-width: 4px;
+  }
+}
+```
+
+## Complex Component Patterns
+
+### Accessible Modal Dialog
+
+```javascript
+class AccessibleModal extends HTMLElement {
+  constructor() {
+    super();
+    this.isOpen = false;
+    this.previousFocus = null;
+    this.render();
+    this.addEventListeners();
+  }
+
+  render() {
+    this.innerHTML = `
+      <div 
+        class="modal-backdrop" 
+        role="dialog" 
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        aria-describedby="modal-description"
+        hidden
+      >
+        <div class="modal-content">
+          <header class="modal-header">
+            <h2 id="modal-title">
+              ${this.getAttribute('title') || 'Modal Dialog'}
+            </h2>
+            <button 
+              type="button" 
+              class="modal-close" 
+              aria-label="Close dialog"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </header>
+          <div id="modal-description" class="modal-body">
+            <slot></slot>
+          </div>
+          <footer class="modal-actions">
+            <button type="button" class="modal-cancel">Cancel</button>
+            <button type="button" class="modal-confirm">OK</button>
+          </footer>
+        </div>
+      </div>
+    `;
+  }
+
+  addEventListeners() {
+    const backdrop = this.querySelector('.modal-backdrop');
+    const closeBtn = this.querySelector('.modal-close');
+    const cancelBtn = this.querySelector('.modal-cancel');
+    const confirmBtn = this.querySelector('.modal-confirm');
+
+    // Close handlers
+    closeBtn.addEventListener('click', () => this.close());
+    cancelBtn.addEventListener('click', () => this.close());
+    
+    // Confirm handler
+    confirmBtn.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('confirm'));
+      this.close();
+    });
+
+    // Backdrop click to close
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) {
+        this.close();
+      }
+    });
+
+    // Keyboard navigation
+    backdrop.addEventListener('keydown', (e) => {
+      this.handleKeydown(e);
+    });
+  }
+
+  handleKeydown(e) {
+    if (e.key === 'Escape') {
+      this.close();
+      return;
+    }
+
+    // Trap focus within modal
+    if (e.key === 'Tab') {
+      this.trapFocus(e);
+    }
+  }
+
+  trapFocus(e) {
+    const focusableElements = this.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    
+    const firstFocusable = focusableElements[0];
+    const lastFocusable = focusableElements[focusableElements.length - 1];
+
+    if (e.shiftKey) {
+      if (document.activeElement === firstFocusable) {
+        lastFocusable.focus();
+        e.preventDefault();
+      }
+    } else {
+      if (document.activeElement === lastFocusable) {
+        firstFocusable.focus();
+        e.preventDefault();
+      }
+    }
+  }
+
+  open() {
+    if (this.isOpen) return;
+
+    this.isOpen = true;
+    this.previousFocus = document.activeElement;
+    
+    const backdrop = this.querySelector('.modal-backdrop');
+    backdrop.hidden = false;
+    
+    // Set focus to first focusable element
+    const firstFocusable = this.querySelector('button, [href], input, select, textarea');
+    if (firstFocusable) {
+      firstFocusable.focus();
+    }
+
+    // Prevent background scrolling
+    document.body.style.overflow = 'hidden';
+    
+    // Announce to screen readers
+    this.setAttribute('aria-live', 'polite');
+    
+    this.dispatchEvent(new CustomEvent('modal-opened'));
+  }
+
+  close() {
+    if (!this.isOpen) return;
+
+    this.isOpen = false;
+    
+    const backdrop = this.querySelector('.modal-backdrop');
+    backdrop.hidden = true;
+    
+    // Restore focus
+    if (this.previousFocus) {
+      this.previousFocus.focus();
+    }
+    
+    // Restore scrolling
+    document.body.style.overflow = '';
+    
+    this.dispatchEvent(new CustomEvent('modal-closed'));
+  }
+}
+
+customElements.define('accessible-modal', AccessibleModal);
+```
+
+### Accessible Dropdown/Combobox
+
+```javascript
+class AccessibleDropdown extends HTMLElement {
+  constructor() {
+    super();
+    this.isOpen = false;
+    this.selectedIndex = -1;
+    this.options = [];
+    this.render();
+    this.addEventListeners();
+  }
+
+  connectedCallback() {
+    // Parse options from slots or attributes
+    this.parseOptions();
+  }
+
+  parseOptions() {
+    const optionElements = this.querySelectorAll('option');
+    this.options = Array.from(optionElements).map((option, index) => ({
+      value: option.value,
+      text: option.textContent.trim(),
+      disabled: option.disabled,
+      selected: option.selected
+    }));
+
+    if (this.options.some(opt => opt.selected)) {
+      this.selectedIndex = this.options.findIndex(opt => opt.selected);
+    }
+  }
+
+  render() {
+    const selectedOption = this.options[this.selectedIndex];
+    const displayText = selectedOption ? selectedOption.text : 'Select an option';
+
+    this.innerHTML = `
+      <div class="dropdown-container">
+        <button
+          type="button"
+          class="dropdown-toggle"
+          aria-haspopup="listbox"
+          aria-expanded="${this.isOpen}"
+          aria-labelledby="dropdown-label"
+          id="dropdown-button"
+        >
+          <span class="dropdown-text">${displayText}</span>
+          <span class="dropdown-arrow" aria-hidden="true">▼</span>
+        </button>
+        
+        <ul
+          class="dropdown-menu"
+          role="listbox"
+          aria-labelledby="dropdown-label"
+          ${this.isOpen ? '' : 'hidden'}
+        >
+          ${this.options.map((option, index) => `
+            <li
+              role="option"
+              class="dropdown-option ${index === this.selectedIndex ? 'selected' : ''}"
+              aria-selected="${index === this.selectedIndex}"
+              data-index="${index}"
+              ${option.disabled ? 'aria-disabled="true"' : ''}
+            >
+              ${option.text}
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+      
+      <!-- Hidden native select for form submission -->
+      <select name="${this.getAttribute('name') || ''}" hidden>
+        ${this.options.map((option, index) => `
+          <option 
+            value="${option.value}" 
+            ${index === this.selectedIndex ? 'selected' : ''}
+          >
+            ${option.text}
+          </option>
+        `).join('')}
+      </select>
+    `;
+  }
+
+  addEventListeners() {
+    const toggle = this.querySelector('.dropdown-toggle');
+    const menu = this.querySelector('.dropdown-menu');
+
+    toggle.addEventListener('click', () => this.toggle());
+    toggle.addEventListener('keydown', (e) => this.handleToggleKeydown(e));
+    
+    menu.addEventListener('click', (e) => this.handleOptionClick(e));
+    
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!this.contains(e.target)) {
+        this.close();
+      }
+    });
+  }
+
+  handleToggleKeydown(e) {
+    switch (e.key) {
+      case 'ArrowDown':
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        this.open();
+        this.focusOption(0);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        this.open();
+        this.focusOption(this.options.length - 1);
+        break;
+      case 'Escape':
+        this.close();
+        break;
+    }
+  }
+
+  handleOptionClick(e) {
+    const option = e.target.closest('[role="option"]');
+    if (!option) return;
+
+    const index = parseInt(option.dataset.index);
+    if (!this.options[index].disabled) {
+      this.selectOption(index);
+      this.close();
+    }
+  }
+
+  focusOption(index) {
+    const options = this.querySelectorAll('[role="option"]');
+    if (options[index]) {
+      options[index].focus();
+      
+      // Add keyboard navigation for options
+      options[index].onkeydown = (e) => {
+        switch (e.key) {
+          case 'ArrowDown':
+            e.preventDefault();
+            this.focusOption(Math.min(index + 1, this.options.length - 1));
+            break;
+          case 'ArrowUp':
+            e.preventDefault();
+            this.focusOption(Math.max(index - 1, 0));
+            break;
+          case 'Enter':
+          case ' ':
+            e.preventDefault();
+            if (!this.options[index].disabled) {
+              this.selectOption(index);
+              this.close();
+            }
+            break;
+          case 'Escape':
+            this.close();
+            break;
+        }
+      };
+    }
+  }
+
+  selectOption(index) {
+    if (index >= 0 && index < this.options.length) {
+      this.selectedIndex = index;
+      this.render();
+      
+      this.dispatchEvent(new CustomEvent('change', {
+        detail: { 
+          value: this.options[index].value,
+          text: this.options[index].text,
+          index 
+        }
+      }));
+    }
+  }
+
+  toggle() {
+    this.isOpen ? this.close() : this.open();
+  }
+
+  open() {
+    this.isOpen = true;
+    this.render();
+  }
+
+  close() {
+    this.isOpen = false;
+    this.render();
+    this.querySelector('.dropdown-toggle').focus();
+  }
+}
+
+customElements.define('accessible-dropdown', AccessibleDropdown);
+```
+
+## Form Accessibility
+
+### Accessible Form Validation
+
+```javascript
+class AccessibleForm extends HTMLElement {
+  constructor() {
+    super();
+    this.errors = new Map();
+    this.render();
+    this.addEventListeners();
+  }
+
+  render() {
+    this.innerHTML = `
+      <form novalidate>
+        <div class="form-group">
+          <label for="email-input">
+            Email Address
+            <span class="required" aria-label="required">*</span>
+          </label>
+          <input 
+            type="email" 
+            id="email-input" 
+            name="email"
+            required
+            aria-describedby="email-error email-hint"
+            autocomplete="email"
+          >
+          <div id="email-hint" class="form-hint">
+            We'll use this to send you important updates
+          </div>
+          <div 
+            id="email-error" 
+            class="error-message" 
+            role="alert" 
+            aria-live="polite"
+            hidden
+          ></div>
+        </div>
+
+        <div class="form-group">
+          <label for="password-input">
+            Password
+            <span class="required" aria-label="required">*</span>
+          </label>
+          <input 
+            type="password" 
+            id="password-input" 
+            name="password"
+            required
+            minlength="8"
+            aria-describedby="password-error password-requirements"
+            autocomplete="new-password"
+          >
+          <div id="password-requirements" class="form-hint">
+            Must be at least 8 characters long
+          </div>
+          <div 
+            id="password-error" 
+            class="error-message" 
+            role="alert" 
+            aria-live="polite"
+            hidden
+          ></div>
+        </div>
+
+        <div class="form-group">
+          <fieldset>
+            <legend>Communication Preferences</legend>
+            <div class="checkbox-group">
+              <label>
+                <input type="checkbox" name="notifications" value="email">
+                Email notifications
+              </label>
+              <label>
+                <input type="checkbox" name="notifications" value="sms">
+                SMS updates
+              </label>
+              <label>
+                <input type="checkbox" name="notifications" value="push">
+                Push notifications
+              </label>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="primary-button">
+            Create Account
+          </button>
+          <button type="button" class="secondary-button">
+            Cancel
+          </button>
+        </div>
+        
+        <!-- Form-level error summary -->
+        <div 
+          id="form-errors" 
+          class="error-summary" 
+          role="alert" 
+          aria-live="polite"
+          hidden
+        >
+          <h3>Please correct the following errors:</h3>
+          <ul></ul>
+        </div>
+      </form>
+    `;
+  }
+
+  addEventListeners() {
+    const form = this.querySelector('form');
+    const inputs = form.querySelectorAll('input[required]');
+
+    // Real-time validation
+    inputs.forEach(input => {
+      input.addEventListener('blur', () => this.validateField(input));
+      input.addEventListener('input', () => this.clearFieldError(input));
+    });
+
+    form.addEventListener('submit', (e) => this.handleSubmit(e));
+  }
+
+  validateField(input) {
+    const errors = [];
+    const value = input.value.trim();
+
+    // Required field validation
+    if (input.hasAttribute('required') && !value) {
+      errors.push(`${this.getFieldLabel(input)} is required`);
+    }
+
+    // Email validation
+    if (input.type === 'email' && value && !this.isValidEmail(value)) {
+      errors.push('Please enter a valid email address');
+    }
+
+    // Password validation
+    if (input.type === 'password' && value && value.length < 8) {
+      errors.push('Password must be at least 8 characters long');
+    }
+
+    this.setFieldError(input, errors);
+    return errors.length === 0;
+  }
+
+  isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  getFieldLabel(input) {
+    const label = this.querySelector(`label[for="${input.id}"]`);
+    return label ? label.textContent.replace('*', '').trim() : input.name;
+  }
+
+  setFieldError(input, errors) {
+    const errorElement = this.querySelector(`#${input.id.replace('-input', '-error')}`);
+    
+    if (errors.length > 0) {
+      const errorMessage = errors[0]; // Show first error
+      
+      errorElement.textContent = errorMessage;
+      errorElement.hidden = false;
+      
+      input.setAttribute('aria-invalid', 'true');
+      input.classList.add('error');
+      
+      this.errors.set(input.name, errorMessage);
+    } else {
+      this.clearFieldError(input);
+    }
+  }
+
+  clearFieldError(input) {
+    const errorElement = this.querySelector(`#${input.id.replace('-input', '-error')}`);
+    
+    errorElement.hidden = true;
+    errorElement.textContent = '';
+    
+    input.removeAttribute('aria-invalid');
+    input.classList.remove('error');
+    
+    this.errors.delete(input.name);
+  }
+
+  handleSubmit(e) {
+    e.preventDefault();
+    
+    // Clear previous form-level errors
+    this.clearFormErrors();
+    
+    // Validate all required fields
+    const form = this.querySelector('form');
+    const inputs = form.querySelectorAll('input[required]');
+    let isValid = true;
+
+    inputs.forEach(input => {
+      if (!this.validateField(input)) {
+        isValid = false;
+      }
+    });
+
+    if (isValid) {
+      this.submitForm();
+    } else {
+      this.showFormErrors();
+      this.focusFirstError();
+    }
+  }
+
+  showFormErrors() {
+    const errorSummary = this.querySelector('#form-errors');
+    const errorList = errorSummary.querySelector('ul');
+    
+    errorList.innerHTML = '';
+    
+    this.errors.forEach((message, fieldName) => {
+      const li = document.createElement('li');
+      const input = this.querySelector(`input[name="${fieldName}"]`);
+      
+      li.innerHTML = `<a href="#${input.id}">${message}</a>`;
+      errorList.appendChild(li);
+      
+      // Make error links functional
+      li.querySelector('a').addEventListener('click', (e) => {
+        e.preventDefault();
+        input.focus();
+      });
+    });
+    
+    errorSummary.hidden = false;
+  }
+
+  clearFormErrors() {
+    const errorSummary = this.querySelector('#form-errors');
+    errorSummary.hidden = true;
+  }
+
+  focusFirstError() {
+    const firstErrorField = this.querySelector('input.error');
+    if (firstErrorField) {
+      firstErrorField.focus();
+    }
+  }
+
+  submitForm() {
+    const formData = new FormData(this.querySelector('form'));
+    
+    this.dispatchEvent(new CustomEvent('form-submit', {
+      detail: Object.fromEntries(formData)
+    }));
+    
+    // Show success message
+    const successMessage = document.createElement('div');
+    successMessage.setAttribute('role', 'alert');
+    successMessage.setAttribute('aria-live', 'polite');
+    successMessage.className = 'success-message';
+    successMessage.textContent = 'Form submitted successfully!';
+    
+    this.appendChild(successMessage);
+    
+    setTimeout(() => {
+      successMessage.remove();
+    }, 5000);
+  }
+}
+
+customElements.define('accessible-form', AccessibleForm);
+```
+
+## Visual and Motion Accessibility
+
+### Respecting User Preferences
+
+```css
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .button {
+    border-width: 3px;
+    font-weight: bold;
+  }
+  
+  .modal-backdrop {
+    background: Canvas;
+    color: CanvasText;
+    border: 3px solid ButtonText;
+  }
+}
+
+/* Increased font size preferences */
+@media (prefers-reduced-data: reduce) {
+  /* Optimize for data savings */
+  .background-image {
+    background-image: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #121212;
+    --text-color: #ffffff;
+    --border-color: #333333;
+  }
+}
+```
+
+### Color and Contrast
+
+```javascript
+// Color contrast utility
+class ContrastChecker {
+  static getLuminance(r, g, b) {
+    const [rs, gs, bs] = [r, g, b].map(c => {
+      c = c / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  }
+
+  static getContrastRatio(color1, color2) {
+    const lum1 = this.getLuminance(...color1);
+    const lum2 = this.getLuminance(...color2);
+    
+    const brightest = Math.max(lum1, lum2);
+    const darkest = Math.min(lum1, lum2);
+    
+    return (brightest + 0.05) / (darkest + 0.05);
+  }
+
+  static meetsWCAG(ratio, level = 'AA') {
+    const requirements = {
+      'AA': 4.5,
+      'AAA': 7,
+      'AA-large': 3,
+      'AAA-large': 4.5
+    };
+    
+    return ratio >= requirements[level];
+  }
+
+  static hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? [
+      parseInt(result[1], 16),
+      parseInt(result[2], 16),
+      parseInt(result[3], 16)
+    ] : null;
+  }
+
+  static checkColors(foreground, background) {
+    const fg = this.hexToRgb(foreground);
+    const bg = this.hexToRgb(background);
+    
+    if (!fg || !bg) return null;
+    
+    const ratio = this.getContrastRatio(fg, bg);
+    
+    return {
+      ratio: ratio.toFixed(2),
+      AA: this.meetsWCAG(ratio, 'AA'),
+      AAA: this.meetsWCAG(ratio, 'AAA'),
+      'AA-large': this.meetsWCAG(ratio, 'AA-large'),
+      'AAA-large': this.meetsWCAG(ratio, 'AAA-large')
+    };
+  }
+}
+
+// Usage example
+const contrast = ContrastChecker.checkColors('#000000', '#ffffff');
+console.log('Contrast check:', contrast);
+// { ratio: "21.00", AA: true, AAA: true, AA-large: true, AAA-large: true }
+```
+
+## Testing Accessibility
+
+### Automated Accessibility Testing
+
+```javascript
+// Simple accessibility checker
+class AccessibilityChecker {
+  constructor(element) {
+    this.element = element;
+    this.violations = [];
+  }
+
+  checkAll() {
+    this.checkImages();
+    this.checkHeadings();
+    this.checkForms();
+    this.checkInteractiveElements();
+    this.checkColorContrast();
+    
+    return this.violations;
+  }
+
+  checkImages() {
+    const images = this.element.querySelectorAll('img');
+    
+    images.forEach((img, index) => {
+      if (!img.alt && !img.getAttribute('aria-label')) {
+        this.violations.push({
+          type: 'missing-alt',
+          element: img,
+          message: `Image ${index + 1} is missing alt text`,
+          severity: 'error'
+        });
+      }
+      
+      if (img.alt === img.src || img.alt === img.title) {
+        this.violations.push({
+          type: 'redundant-alt',
+          element: img,
+          message: `Image ${index + 1} has redundant alt text`,
+          severity: 'warning'
+        });
+      }
+    });
+  }
+
+  checkHeadings() {
+    const headings = this.element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    const levels = [];
+    
+    headings.forEach(heading => {
+      const level = parseInt(heading.tagName.charAt(1));
+      levels.push(level);
+      
+      if (heading.textContent.trim() === '') {
+        this.violations.push({
+          type: 'empty-heading',
+          element: heading,
+          message: `${heading.tagName} is empty`,
+          severity: 'error'
+        });
+      }
+    });
+    
+    // Check for skipped heading levels
+    for (let i = 1; i < levels.length; i++) {
+      if (levels[i] - levels[i-1] > 1) {
+        this.violations.push({
+          type: 'skipped-heading',
+          element: headings[i],
+          message: `Heading level skipped from h${levels[i-1]} to h${levels[i]}`,
+          severity: 'warning'
+        });
+      }
+    }
+  }
+
+  checkForms() {
+    const inputs = this.element.querySelectorAll('input, select, textarea');
+    
+    inputs.forEach((input, index) => {
+      const label = this.element.querySelector(`label[for="${input.id}"]`) ||
+                   input.closest('label') ||
+                   this.element.querySelector(`[aria-labelledby="${input.id}"]`);
+      
+      if (!label && !input.getAttribute('aria-label')) {
+        this.violations.push({
+          type: 'missing-label',
+          element: input,
+          message: `Form control ${index + 1} is missing a label`,
+          severity: 'error'
+        });
+      }
+      
+      if (input.hasAttribute('required') && !input.getAttribute('aria-required')) {
+        this.violations.push({
+          type: 'missing-aria-required',
+          element: input,
+          message: `Required field should have aria-required="true"`,
+          severity: 'info'
+        });
+      }
+    });
+  }
+
+  checkInteractiveElements() {
+    const interactives = this.element.querySelectorAll('button, a, input, select, textarea, [tabindex], [role="button"], [role="link"]');
+    
+    interactives.forEach(element => {
+      const tagName = element.tagName.toLowerCase();
+      
+      // Check for proper roles
+      if (tagName === 'div' && element.onclick && !element.getAttribute('role')) {
+        this.violations.push({
+          type: 'missing-role',
+          element: element,
+          message: 'Interactive div should have a proper role (button, link, etc.)',
+          severity: 'error'
+        });
+      }
+      
+      // Check for keyboard accessibility
+      if (element.onclick && tagName === 'div' && !element.tabIndex && element.tabIndex !== 0) {
+        this.violations.push({
+          type: 'not-keyboard-accessible',
+          element: element,
+          message: 'Interactive element should be keyboard accessible',
+          severity: 'error'
+        });
+      }
+      
+      // Check for accessible names
+      const hasAccessibleName = element.textContent.trim() ||
+                               element.getAttribute('aria-label') ||
+                               element.getAttribute('aria-labelledby') ||
+                               element.getAttribute('title');
+      
+      if (!hasAccessibleName && tagName !== 'input') {
+        this.violations.push({
+          type: 'missing-accessible-name',
+          element: element,
+          message: 'Interactive element is missing an accessible name',
+          severity: 'error'
+        });
+      }
+    });
+  }
+
+  generateReport() {
+    const report = {
+      total: this.violations.length,
+      errors: this.violations.filter(v => v.severity === 'error').length,
+      warnings: this.violations.filter(v => v.severity === 'warning').length,
+      info: this.violations.filter(v => v.severity === 'info').length,
+      violations: this.violations
+    };
+    
+    console.group('♿ Accessibility Report');
+    console.log(`Total issues: ${report.total}`);
+    console.log(`Errors: ${report.errors}`);
+    console.log(`Warnings: ${report.warnings}`);
+    console.log(`Info: ${report.info}`);
+    
+    if (report.violations.length > 0) {
+      console.group('Issues found:');
+      report.violations.forEach(violation => {
+        const icon = violation.severity === 'error' ? '❌' : 
+                    violation.severity === 'warning' ? '⚠️' : 'ℹ️';
+        console.log(`${icon} ${violation.message}`, violation.element);
+      });
+      console.groupEnd();
+    }
+    
+    console.groupEnd();
+    
+    return report;
+  }
+}
+
+// Usage
+const checker = new AccessibilityChecker(document.body);
+checker.checkAll();
+const report = checker.generateReport();
+```
+
+## Best Practices Summary
+
+### Development Checklist
+
+```javascript
+// Accessibility checklist for development
+const AccessibilityChecklist = {
+  semantics: [
+    '✓ Use semantic HTML elements (button, nav, main, etc.)',
+    '✓ Proper heading hierarchy (h1 → h2 → h3)',
+    '✓ Meaningful alt text for images',
+    '✓ Form labels associated with inputs'
+  ],
+  
+  keyboard: [
+    '✓ All interactive elements are keyboard accessible',
+    '✓ Visible focus indicators',
+    '✓ Logical tab order',
+    '✓ Skip links for navigation'
+  ],
+  
+  aria: [
+    '✓ ARIA labels for complex components',
+    '✓ Live regions for dynamic content',
+    '✓ Proper ARIA roles and states',
+    '✓ ARIA properties match component behavior'
+  ],
+  
+  visual: [
+    '✓ Sufficient color contrast (4.5:1 for normal text)',
+    '✓ Text resizable to 200% without horizontal scroll',
+    '✓ No information conveyed by color alone',
+    '✓ Respects prefers-reduced-motion'
+  ],
+  
+  testing: [
+    '✓ Test with screen readers',
+    '✓ Test keyboard-only navigation',
+    '✓ Automated accessibility testing',
+    '✓ Manual testing with real users'
+  ]
+};
+
+// Print checklist
+Object.entries(AccessibilityChecklist).forEach(([category, items]) => {
+  console.group(`${category.toUpperCase()}`);
+  items.forEach(item => console.log(item));
+  console.groupEnd();
+});
+```
+
+### Screen Reader Testing Commands
+
+```javascript
+// Screen reader testing guide
+const ScreenReaderCommands = {
+  NVDA: {
+    navigation: {
+      'Tab / Shift+Tab': 'Navigate between focusable elements',
+      'Arrow keys': 'Navigate through content',
+      'H / Shift+H': 'Navigate between headings',
+      'F / Shift+F': 'Navigate between form fields',
+      'B / Shift+B': 'Navigate between buttons',
+      'L / Shift+L': 'Navigate between links'
+    },
+    reading: {
+      'Ctrl+A': 'Select all and read entire page',
+      'Insert+Down': 'Read current line',
+      'Insert+Up': 'Read current word',
+      'Insert+Ctrl+Up': 'Read from cursor to top',
+      'Insert+Ctrl+Down': 'Read from cursor to end'
+    }
+  },
+  
+  VoiceOver: {
+    navigation: {
+      'VO+Arrow keys': 'Navigate through content',
+      'VO+Cmd+H': 'Navigate between headings',
+      'VO+Cmd+L': 'Navigate between links',
+      'VO+Cmd+F': 'Navigate between form controls',
+      'Tab': 'Navigate between focusable elements'
+    },
+    reading: {
+      'VO+A': 'Read entire page',
+      'VO+R': 'Read from current position',
+      'VO+S': 'Toggle speech on/off',
+      'Ctrl': 'Stop speech'
+    }
+  }
+};
+
+console.table(ScreenReaderCommands.NVDA.navigation);
+```
+
+## Conclusion
+
+Building accessible web components requires a comprehensive approach that includes:
+
+**Technical Implementation:**
+- Start with semantic HTML
+- Add ARIA attributes thoughtfully
+- Implement proper keyboard navigation
+- Manage focus appropriately
+
+**Visual Accessibility:**
+- Ensure sufficient color contrast
+- Respect user motion preferences
+- Support high contrast modes
+- Design for various font sizes
+
+**Testing Strategy:**
+- Use automated tools for initial checks
+- Test with real screen readers
+- Validate keyboard navigation
+- Get feedback from users with disabilities
+
+**Key Benefits:**
+- ✅ **Better UX for everyone** - Accessibility improvements benefit all users
+- ✅ **Legal compliance** - Meet WCAG guidelines and avoid litigation
+- ✅ **Improved SEO** - Semantic markup helps search engines
+- ✅ **Better code quality** - Accessible code tends to be more robust
+
+Remember: Accessibility is not a feature to add later—it's a fundamental part of good web development. Build it in from the start, and you'll create better experiences for everyone.
+
+Start with the basics (semantic HTML, proper labels, keyboard navigation) and gradually implement more advanced patterns as your understanding grows. Every step toward better accessibility makes the web more inclusive.

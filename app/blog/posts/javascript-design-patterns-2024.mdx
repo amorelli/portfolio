@@ -1,0 +1,846 @@
+---
+title: "JavaScript Design Patterns for 2024: Modern Approaches to Common Problems"
+publishedAt: "2025-06-24"
+summary: "Explore essential JavaScript design patterns with modern ES6+ syntax, including practical examples of Observer, Module, Factory, and more patterns tailored for contemporary development"
+---
+
+## Introduction
+
+Design patterns are proven solutions to recurring problems in software design. While classical design patterns remain valuable, JavaScript's evolution with ES6+, modules, and modern frameworks has transformed how we implement these patterns.
+
+This guide explores essential design patterns adapted for modern JavaScript development, focusing on practical applications you'll encounter in real projects.
+
+## The Module Pattern (Modern ES6+ Version)
+
+The Module pattern encapsulates related functionality and controls access to internal implementation details.
+
+### Classic Module Pattern with ES6 Classes
+
+```javascript
+// UserService.js - Encapsulated user management
+class UserService {
+  #users = new Map();
+  #nextId = 1;
+
+  // Private method
+  #validateUser(user) {
+    if (!user.name || !user.email) {
+      throw new Error('Name and email are required');
+    }
+  }
+
+  // Public interface
+  createUser(userData) {
+    this.#validateUser(userData);
+    
+    const user = {
+      id: this.#nextId++,
+      ...userData,
+      createdAt: new Date()
+    };
+    
+    this.#users.set(user.id, user);
+    return user;
+  }
+
+  getUser(id) {
+    return this.#users.get(id);
+  }
+
+  getAllUsers() {
+    return Array.from(this.#users.values());
+  }
+
+  deleteUser(id) {
+    return this.#users.delete(id);
+  }
+
+  // Computed property
+  get userCount() {
+    return this.#users.size;
+  }
+}
+
+// Usage
+const userService = new UserService();
+const user = userService.createUser({ name: 'John', email: 'john@example.com' });
+console.log(userService.userCount); // 1
+```
+
+### Module Pattern with Factory Function
+
+```javascript
+// themeManager.js - Creating multiple theme instances
+export const createThemeManager = (initialTheme = 'light') => {
+  let currentTheme = initialTheme;
+  const subscribers = new Set();
+  
+  // Private functions
+  const notifySubscribers = () => {
+    subscribers.forEach(callback => callback(currentTheme));
+  };
+  
+  const validateTheme = (theme) => {
+    const validThemes = ['light', 'dark', 'system'];
+    if (!validThemes.includes(theme)) {
+      throw new Error(`Invalid theme: ${theme}`);
+    }
+  };
+  
+  // Public interface
+  return {
+    get theme() {
+      return currentTheme;
+    },
+    
+    setTheme(newTheme) {
+      validateTheme(newTheme);
+      currentTheme = newTheme;
+      notifySubscribers();
+    },
+    
+    subscribe(callback) {
+      subscribers.add(callback);
+      // Return unsubscribe function
+      return () => subscribers.delete(callback);
+    },
+    
+    getValidThemes() {
+      return ['light', 'dark', 'system'];
+    }
+  };
+};
+
+// Usage
+import { createThemeManager } from './themeManager.js';
+
+const themeManager = createThemeManager('dark');
+const unsubscribe = themeManager.subscribe(theme => {
+  console.log(`Theme changed to: ${theme}`);
+});
+
+themeManager.setTheme('light'); // Logs: "Theme changed to: light"
+```
+
+## Observer Pattern
+
+The Observer pattern allows objects to notify multiple dependents about state changes.
+
+### Modern Observer with Custom Events
+
+```javascript
+// EventEmitter class using modern features
+class EventEmitter {
+  #events = new Map();
+
+  on(event, listener) {
+    if (!this.#events.has(event)) {
+      this.#events.set(event, new Set());
+    }
+    this.#events.get(event).add(listener);
+
+    // Return unsubscribe function
+    return () => this.off(event, listener);
+  }
+
+  once(event, listener) {
+    const removeListener = this.on(event, (...args) => {
+      removeListener();
+      listener(...args);
+    });
+    return removeListener;
+  }
+
+  off(event, listener) {
+    if (this.#events.has(event)) {
+      this.#events.get(event).delete(listener);
+    }
+  }
+
+  emit(event, ...args) {
+    if (this.#events.has(event)) {
+      this.#events.get(event).forEach(listener => {
+        try {
+          listener(...args);
+        } catch (error) {
+          console.error('Error in event listener:', error);
+        }
+      });
+    }
+  }
+
+  listenerCount(event) {
+    return this.#events.get(event)?.size || 0;
+  }
+
+  removeAllListeners(event) {
+    if (event) {
+      this.#events.delete(event);
+    } else {
+      this.#events.clear();
+    }
+  }
+}
+
+// Shopping cart with observer pattern
+class ShoppingCart extends EventEmitter {
+  #items = [];
+  #total = 0;
+
+  addItem(item) {
+    this.#items.push(item);
+    this.#calculateTotal();
+    this.emit('itemAdded', item, this.#items.length);
+    this.emit('cartChanged', { items: [...this.#items], total: this.#total });
+  }
+
+  removeItem(itemId) {
+    const index = this.#items.findIndex(item => item.id === itemId);
+    if (index > -1) {
+      const removedItem = this.#items.splice(index, 1)[0];
+      this.#calculateTotal();
+      this.emit('itemRemoved', removedItem, this.#items.length);
+      this.emit('cartChanged', { items: [...this.#items], total: this.#total });
+    }
+  }
+
+  #calculateTotal() {
+    this.#total = this.#items.reduce((sum, item) => sum + item.price, 0);
+  }
+
+  get items() {
+    return [...this.#items];
+  }
+
+  get total() {
+    return this.#total;
+  }
+}
+
+// Usage
+const cart = new ShoppingCart();
+
+// Subscribe to events
+const unsubscribeCartChanged = cart.on('cartChanged', ({ items, total }) => {
+  console.log(`Cart updated: ${items.length} items, Total: $${total}`);
+});
+
+cart.on('itemAdded', (item, count) => {
+  console.log(`Added ${item.name} - ${count} items in cart`);
+});
+
+cart.addItem({ id: 1, name: 'Laptop', price: 999 });
+cart.addItem({ id: 2, name: 'Mouse', price: 29 });
+```
+
+## Factory Pattern
+
+The Factory pattern creates objects without specifying their exact classes.
+
+### Abstract Factory with Polymorphism
+
+```javascript
+// Base notification class
+class Notification {
+  constructor(message, options = {}) {
+    this.message = message;
+    this.timestamp = new Date();
+    this.options = options;
+  }
+
+  send() {
+    throw new Error('send() method must be implemented');
+  }
+}
+
+// Concrete implementations
+class EmailNotification extends Notification {
+  constructor(message, { to, subject, ...options } = {}) {
+    super(message, options);
+    this.to = to;
+    this.subject = subject;
+  }
+
+  async send() {
+    // Simulate email sending
+    console.log(`📧 Email sent to ${this.to}`);
+    console.log(`Subject: ${this.subject}`);
+    console.log(`Message: ${this.message}`);
+    return { type: 'email', sent: true, to: this.to };
+  }
+}
+
+class SMSNotification extends Notification {
+  constructor(message, { phone, ...options } = {}) {
+    super(message, options);
+    this.phone = phone;
+  }
+
+  async send() {
+    console.log(`📱 SMS sent to ${this.phone}: ${this.message}`);
+    return { type: 'sms', sent: true, to: this.phone };
+  }
+}
+
+class PushNotification extends Notification {
+  constructor(message, { deviceId, title, ...options } = {}) {
+    super(message, options);
+    this.deviceId = deviceId;
+    this.title = title;
+  }
+
+  async send() {
+    console.log(`🔔 Push notification sent to device ${this.deviceId}`);
+    console.log(`Title: ${this.title}`);
+    console.log(`Message: ${this.message}`);
+    return { type: 'push', sent: true, deviceId: this.deviceId };
+  }
+}
+
+// Factory class
+class NotificationFactory {
+  static #creators = new Map([
+    ['email', EmailNotification],
+    ['sms', SMSNotification],
+    ['push', PushNotification],
+  ]);
+
+  static create(type, message, options) {
+    const Creator = this.#creators.get(type);
+    
+    if (!Creator) {
+      throw new Error(`Unknown notification type: ${type}`);
+    }
+
+    return new Creator(message, options);
+  }
+
+  static registerType(type, creator) {
+    this.#creators.set(type, creator);
+  }
+
+  static getAvailableTypes() {
+    return Array.from(this.#creators.keys());
+  }
+}
+
+// Usage
+const notifications = [
+  NotificationFactory.create('email', 'Welcome to our service!', {
+    to: 'user@example.com',
+    subject: 'Welcome!'
+  }),
+  NotificationFactory.create('sms', 'Your order is ready', {
+    phone: '+1234567890'
+  }),
+  NotificationFactory.create('push', 'New message received', {
+    deviceId: 'device123',
+    title: 'Messages'
+  })
+];
+
+// Send all notifications
+Promise.all(notifications.map(notification => notification.send()))
+  .then(results => console.log('All notifications sent:', results));
+```
+
+## Strategy Pattern
+
+The Strategy pattern defines a family of algorithms and makes them interchangeable.
+
+### Payment Processing Strategy
+
+```javascript
+// Payment strategies
+class PaymentStrategy {
+  processPayment(amount) {
+    throw new Error('processPayment must be implemented');
+  }
+}
+
+class CreditCardStrategy extends PaymentStrategy {
+  constructor(cardNumber, expiryDate, cvv) {
+    super();
+    this.cardNumber = cardNumber;
+    this.expiryDate = expiryDate;
+    this.cvv = cvv;
+  }
+
+  async processPayment(amount) {
+    // Simulate credit card processing
+    const processingFee = amount * 0.029; // 2.9% fee
+    
+    console.log(`💳 Processing credit card payment: $${amount}`);
+    console.log(`Card ending in: ${this.cardNumber.slice(-4)}`);
+    console.log(`Processing fee: $${processingFee.toFixed(2)}`);
+    
+    // Simulate async processing
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    return {
+      success: true,
+      transactionId: `cc_${Date.now()}`,
+      amount,
+      fee: processingFee,
+      method: 'credit_card'
+    };
+  }
+}
+
+class PayPalStrategy extends PaymentStrategy {
+  constructor(email) {
+    super();
+    this.email = email;
+  }
+
+  async processPayment(amount) {
+    const processingFee = amount * 0.034; // 3.4% fee
+    
+    console.log(`🅿️ Processing PayPal payment: $${amount}`);
+    console.log(`PayPal account: ${this.email}`);
+    console.log(`Processing fee: $${processingFee.toFixed(2)}`);
+    
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    return {
+      success: true,
+      transactionId: `pp_${Date.now()}`,
+      amount,
+      fee: processingFee,
+      method: 'paypal'
+    };
+  }
+}
+
+class CryptoStrategy extends PaymentStrategy {
+  constructor(walletAddress, currency = 'BTC') {
+    super();
+    this.walletAddress = walletAddress;
+    this.currency = currency;
+  }
+
+  async processPayment(amount) {
+    const networkFee = 0.0001; // Fixed network fee
+    
+    console.log(`₿ Processing crypto payment: $${amount}`);
+    console.log(`Currency: ${this.currency}`);
+    console.log(`Wallet: ${this.walletAddress.slice(0, 8)}...`);
+    console.log(`Network fee: ${networkFee} ${this.currency}`);
+    
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    return {
+      success: true,
+      transactionId: `crypto_${Date.now()}`,
+      amount,
+      fee: networkFee,
+      method: 'cryptocurrency',
+      currency: this.currency
+    };
+  }
+}
+
+// Payment processor context
+class PaymentProcessor {
+  constructor(strategy) {
+    this.strategy = strategy;
+  }
+
+  setStrategy(strategy) {
+    this.strategy = strategy;
+  }
+
+  async processPayment(amount) {
+    if (!this.strategy) {
+      throw new Error('Payment strategy not set');
+    }
+
+    try {
+      const result = await this.strategy.processPayment(amount);
+      console.log('✅ Payment successful:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Payment failed:', error);
+      throw error;
+    }
+  }
+}
+
+// Usage
+const processor = new PaymentProcessor(
+  new CreditCardStrategy('4532123456789012', '12/25', '123')
+);
+
+// Process payment with credit card
+await processor.processPayment(100);
+
+// Switch to PayPal
+processor.setStrategy(new PayPalStrategy('user@example.com'));
+await processor.processPayment(75);
+
+// Switch to crypto
+processor.setStrategy(new CryptoStrategy('1A2B3C4D5E6F7G8H9I', 'ETH'));
+await processor.processPayment(200);
+```
+
+## Decorator Pattern
+
+The Decorator pattern adds new functionality to objects without altering their structure.
+
+### Function Decorators with Higher-Order Functions
+
+```javascript
+// Performance monitoring decorator
+const withPerformanceMonitoring = (fn, label) => {
+  return async (...args) => {
+    const start = performance.now();
+    console.log(`⏱️ Starting ${label || fn.name}`);
+    
+    try {
+      const result = await fn(...args);
+      const duration = performance.now() - start;
+      console.log(`✅ Completed ${label || fn.name} in ${duration.toFixed(2)}ms`);
+      return result;
+    } catch (error) {
+      const duration = performance.now() - start;
+      console.error(`❌ Failed ${label || fn.name} after ${duration.toFixed(2)}ms:`, error);
+      throw error;
+    }
+  };
+};
+
+// Retry decorator
+const withRetry = (fn, maxAttempts = 3, delayMs = 1000) => {
+  return async (...args) => {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn(...args);
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt === maxAttempts) {
+          throw error;
+        }
+        
+        console.warn(`Attempt ${attempt} failed, retrying in ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  };
+};
+
+// Cache decorator
+const withCache = (fn, ttlMs = 300000) => { // 5 minute default TTL
+  const cache = new Map();
+  
+  return async (...args) => {
+    const key = JSON.stringify(args);
+    const cached = cache.get(key);
+    
+    if (cached && Date.now() < cached.expiry) {
+      console.log('📦 Cache hit');
+      return cached.value;
+    }
+    
+    const result = await fn(...args);
+    cache.set(key, {
+      value: result,
+      expiry: Date.now() + ttlMs
+    });
+    
+    console.log('🆕 Cache miss - value cached');
+    return result;
+  };
+};
+
+// Rate limiting decorator
+const withRateLimit = (fn, maxCalls = 10, windowMs = 60000) => {
+  const calls = [];
+  
+  return async (...args) => {
+    const now = Date.now();
+    
+    // Remove old calls outside the window
+    while (calls.length > 0 && calls[0] < now - windowMs) {
+      calls.shift();
+    }
+    
+    if (calls.length >= maxCalls) {
+      throw new Error(`Rate limit exceeded: ${maxCalls} calls per ${windowMs}ms`);
+    }
+    
+    calls.push(now);
+    return await fn(...args);
+  };
+};
+
+// Example API function
+const fetchUserData = async (userId) => {
+  // Simulate API call
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  if (Math.random() < 0.1) { // 10% failure rate
+    throw new Error('API temporarily unavailable');
+  }
+  
+  return {
+    id: userId,
+    name: `User ${userId}`,
+    email: `user${userId}@example.com`
+  };
+};
+
+// Apply decorators (composition)
+const robustFetchUserData = withPerformanceMonitoring(
+  withCache(
+    withRetry(
+      withRateLimit(fetchUserData, 5, 10000),
+      3,
+      1000
+    ),
+    30000 // 30 second cache
+  ),
+  'fetchUserData'
+);
+
+// Usage
+try {
+  const user1 = await robustFetchUserData(123);
+  console.log('User 1:', user1);
+  
+  const user2 = await robustFetchUserData(123); // Cache hit
+  console.log('User 2:', user2);
+} catch (error) {
+  console.error('Failed to fetch user:', error);
+}
+```
+
+## Command Pattern
+
+The Command pattern encapsulates requests as objects, allowing you to parameterize objects with operations.
+
+### Undo/Redo System
+
+```javascript
+// Command interface
+class Command {
+  execute() {
+    throw new Error('execute() must be implemented');
+  }
+  
+  undo() {
+    throw new Error('undo() must be implemented');
+  }
+  
+  get description() {
+    return this.constructor.name;
+  }
+}
+
+// Concrete commands
+class AddItemCommand extends Command {
+  constructor(list, item) {
+    super();
+    this.list = list;
+    this.item = item;
+  }
+  
+  execute() {
+    this.list.push(this.item);
+    return `Added "${this.item}"`;
+  }
+  
+  undo() {
+    const index = this.list.indexOf(this.item);
+    if (index > -1) {
+      this.list.splice(index, 1);
+      return `Removed "${this.item}"`;
+    }
+  }
+  
+  get description() {
+    return `Add "${this.item}"`;
+  }
+}
+
+class RemoveItemCommand extends Command {
+  constructor(list, item) {
+    super();
+    this.list = list;
+    this.item = item;
+    this.removedIndex = -1;
+  }
+  
+  execute() {
+    this.removedIndex = this.list.indexOf(this.item);
+    if (this.removedIndex > -1) {
+      this.list.splice(this.removedIndex, 1);
+      return `Removed "${this.item}"`;
+    }
+    return `Item "${this.item}" not found`;
+  }
+  
+  undo() {
+    if (this.removedIndex > -1) {
+      this.list.splice(this.removedIndex, 0, this.item);
+      return `Restored "${this.item}"`;
+    }
+  }
+  
+  get description() {
+    return `Remove "${this.item}"`;
+  }
+}
+
+class ClearListCommand extends Command {
+  constructor(list) {
+    super();
+    this.list = list;
+    this.previousItems = [];
+  }
+  
+  execute() {
+    this.previousItems = [...this.list];
+    this.list.length = 0;
+    return 'Cleared all items';
+  }
+  
+  undo() {
+    this.list.push(...this.previousItems);
+    return `Restored ${this.previousItems.length} items`;
+  }
+  
+  get description() {
+    return 'Clear list';
+  }
+}
+
+// Command manager (Invoker)
+class CommandManager {
+  constructor() {
+    this.history = [];
+    this.currentIndex = -1;
+  }
+  
+  execute(command) {
+    // Remove any commands after current index (for redo scenarios)
+    this.history = this.history.slice(0, this.currentIndex + 1);
+    
+    const result = command.execute();
+    
+    this.history.push(command);
+    this.currentIndex++;
+    
+    console.log(`✅ Executed: ${command.description} - ${result}`);
+    return result;
+  }
+  
+  undo() {
+    if (this.currentIndex >= 0) {
+      const command = this.history[this.currentIndex];
+      const result = command.undo();
+      this.currentIndex--;
+      
+      console.log(`↶ Undone: ${command.description} - ${result}`);
+      return result;
+    }
+    
+    console.log('Nothing to undo');
+    return null;
+  }
+  
+  redo() {
+    if (this.currentIndex < this.history.length - 1) {
+      this.currentIndex++;
+      const command = this.history[this.currentIndex];
+      const result = command.execute();
+      
+      console.log(`↷ Redone: ${command.description} - ${result}`);
+      return result;
+    }
+    
+    console.log('Nothing to redo');
+    return null;
+  }
+  
+  getHistory() {
+    return this.history.map((command, index) => ({
+      index,
+      description: command.description,
+      isActive: index <= this.currentIndex
+    }));
+  }
+  
+  canUndo() {
+    return this.currentIndex >= 0;
+  }
+  
+  canRedo() {
+    return this.currentIndex < this.history.length - 1;
+  }
+}
+
+// Usage example
+const todoList = [];
+const commandManager = new CommandManager();
+
+// Execute commands
+commandManager.execute(new AddItemCommand(todoList, 'Buy groceries'));
+commandManager.execute(new AddItemCommand(todoList, 'Walk the dog'));
+commandManager.execute(new AddItemCommand(todoList, 'Read a book'));
+console.log('Current list:', todoList);
+
+commandManager.execute(new RemoveItemCommand(todoList, 'Walk the dog'));
+console.log('After removal:', todoList);
+
+// Undo operations
+commandManager.undo(); // Undo remove
+console.log('After undo:', todoList);
+
+commandManager.undo(); // Undo last add
+console.log('After undo:', todoList);
+
+// Redo operations
+commandManager.redo();
+console.log('After redo:', todoList);
+
+// View history
+console.log('Command history:', commandManager.getHistory());
+```
+
+## Modern Patterns Summary
+
+### Choosing the Right Pattern
+
+| Pattern | Use When | Modern Benefits |
+|---------|----------|-----------------|
+| **Module** | Encapsulating related functionality | Private fields, ES6 modules |
+| **Observer** | Need to notify multiple dependents | Custom events, async handling |
+| **Factory** | Creating objects with complex logic | Classes, Maps for registration |
+| **Strategy** | Multiple algorithms for same task | Async/await, polymorphism |
+| **Decorator** | Adding behavior without modification | Higher-order functions, composition |
+| **Command** | Encapsulating operations for undo/redo | Classes with async operations |
+
+### Best Practices for Modern JavaScript Patterns
+
+1. **Use ES6+ Features**: Leverage classes, private fields, async/await, and modules
+2. **Favor Composition**: Combine patterns and use higher-order functions
+3. **Handle Async Operations**: Design patterns with Promise-based APIs
+4. **Type Safety**: Consider TypeScript for better pattern implementation
+5. **Performance**: Use WeakMap/WeakSet for memory-efficient patterns
+
+## Conclusion
+
+Modern JavaScript design patterns leverage ES6+ features to create more maintainable, scalable applications. Key takeaways:
+
+- **Private fields** enable true encapsulation in classes
+- **Async/await** simplifies asynchronous pattern implementations
+- **Higher-order functions** provide elegant decorator compositions
+- **ES6 modules** offer clean separation of concerns
+- **Map and Set** collections improve pattern efficiency
+
+These patterns form the foundation for building robust JavaScript applications. Start with the Module and Observer patterns, then gradually incorporate others as your application complexity grows.
+
+Remember: patterns are tools, not rules. Choose the right pattern for your specific problem, and don't over-engineer simple solutions.

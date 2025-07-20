@@ -35,7 +35,8 @@ export default function Footer() {
             className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
             rel="noopener noreferrer"
             target="_blank"
-            href="https://github.com/amorelli"
+            // href="https://github.com/amorelli"
+            href='#'
           >
             <ArrowIcon />
             <p className="ml-2 h-7">GitHub</p>
@@ -46,7 +47,8 @@ export default function Footer() {
             className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
             rel="noopener noreferrer"
             target="_blank"
-            href="https://www.linkedin.com/in/adam-david-morelli/"
+            // href="https://www.linkedin.com/in/adam-david-morelli/"
+            href='#'
           >
             <ArrowIcon />
             <p className="ml-2 h-7">LinkedIn</p>

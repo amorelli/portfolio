@@ -1,0 +1,1001 @@
+---
+title: "Advanced TypeScript Patterns: Type-Level Programming and Beyond"
+publishedAt: "2025-04-15"
+summary: "Master advanced TypeScript techniques including conditional types, template literals, mapped types, and type-level programming with practical real-world examples"
+---
+
+## Introduction
+
+TypeScript's type system is incredibly powerful, enabling sophisticated type-level programming that can prevent runtime errors, improve developer experience, and create robust APIs. Beyond basic types and generics, TypeScript offers advanced features that allow you to build complex, type-safe abstractions.
+
+This guide explores advanced TypeScript patterns that will elevate your type-level programming skills and help you build more maintainable, type-safe applications.
+
+## Conditional Types
+
+Conditional types enable type logic, allowing types to change based on conditions.
+
+### Basic Conditional Types
+
+```typescript
+// Basic conditional type syntax
+type IsString<T> = T extends string ? true : false;
+
+type Test1 = IsString<string>;  // true
+type Test2 = IsString<number>;  // false
+type Test3 = IsString<"hello">; // true
+
+// More practical examples
+type NonNullable<T> = T extends null | undefined ? never : T;
+
+type ApiResponse<T> = T extends string
+  ? { message: T }
+  : T extends number
+  ? { code: T }
+  : { data: T };
+
+type StringResponse = ApiResponse<string>;  // { message: string }
+type NumberResponse = ApiResponse<number>;  // { code: number }
+type ObjectResponse = ApiResponse<{ id: number }>; // { data: { id: number } }
+```
+
+### Distributive Conditional Types
+
+```typescript
+// Distributive conditional types work with union types
+type ToArray<T> = T extends any ? T[] : never;
+
+type StringOrNumber = string | number;
+type ArrayResult = ToArray<StringOrNumber>; // string[] | number[]
+
+// Non-distributive version
+type ToArrayNonDistributive<T> = [T] extends [any] ? T[] : never;
+type ArrayResultNonDist = ToArrayNonDistributive<StringOrNumber>; // (string | number)[]
+
+// Practical example: Extract function return types
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+
+type FuncReturn1 = ReturnType<() => string>;           // string
+type FuncReturn2 = ReturnType<(x: number) => number>;  // number
+type FuncReturn3 = ReturnType<string>;                 // never
+
+// Extract promise values
+type Awaited<T> = T extends Promise<infer U> ? U : T;
+
+type PromiseString = Awaited<Promise<string>>;  // string
+type PlainString = Awaited<string>;             // string
+type NestedPromise = Awaited<Promise<Promise<number>>>; // Promise<number>
+
+// Recursive awaited type
+type DeepAwaited<T> = T extends Promise<infer U> 
+  ? DeepAwaited<U> 
+  : T;
+
+type FullyAwaited = DeepAwaited<Promise<Promise<Promise<string>>>>; // string
+```
+
+## Template Literal Types
+
+Template literal types enable string manipulation at the type level.
+
+### Basic Template Literals
+
+```typescript
+// Basic template literal types
+type Greeting = `Hello, ${string}!`;
+
+type PersonalGreeting = `Hello, ${'Alice' | 'Bob' | 'Charlie'}!`;
+// "Hello, Alice!" | "Hello, Bob!" | "Hello, Charlie!"
+
+// HTTP methods with paths
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type ApiPath = '/users' | '/posts' | '/comments';
+
+type ApiEndpoint = `${HttpMethod} ${ApiPath}`;
+// "GET /users" | "POST /users" | "PUT /users" | "DELETE /users" | etc.
+
+// CSS properties
+type CSSUnit = 'px' | 'rem' | 'em' | '%';
+type CSSValue<T extends number> = `${T}${CSSUnit}`;
+
+type Margin = CSSValue<10>; // "10px" | "10rem" | "10em" | "10%"
+```
+
+### Advanced String Manipulation
+
+```typescript
+// Capitalize first letter
+type Capitalize<S extends string> = S extends `${infer F}${infer R}`
+  ? `${Uppercase<F>}${R}`
+  : S;
+
+type CapitalizedName = Capitalize<'john'>; // "John"
+
+// Convert to camelCase
+type CamelCase<S extends string> = S extends `${infer P1}_${infer P2}${infer P3}`
+  ? `${P1}${Capitalize<CamelCase<`${P2}${P3}`>>}`
+  : S;
+
+type CamelCased = CamelCase<'user_name_field'>; // "userNameField"
+
+// Extract route parameters
+type ExtractRouteParams<T extends string> = 
+  T extends `${string}:${infer Param}/${infer Rest}`
+    ? { [K in Param | keyof ExtractRouteParams<`/${Rest}`>]: string }
+    : T extends `${string}:${infer Param}`
+    ? { [K in Param]: string }
+    : {};
+
+type RouteParams = ExtractRouteParams<'/users/:userId/posts/:postId'>;
+// { userId: string; postId: string }
+
+// SQL-like query builder types
+type SelectClause<T> = `SELECT ${T}`;
+type FromClause<T> = `FROM ${T}`;
+type WhereClause<T> = `WHERE ${T}`;
+
+type SqlQuery<S extends string, T extends string, W extends string = ''> = 
+  W extends '' 
+    ? `${SelectClause<S>} ${FromClause<T>}`
+    : `${SelectClause<S>} ${FromClause<T>} ${WhereClause<W>}`;
+
+type UserQuery = SqlQuery<'*', 'users', 'age > 18'>;
+// "SELECT * FROM users WHERE age > 18"
+```
+
+## Mapped Types
+
+Mapped types create new types by transforming properties of existing types.
+
+### Basic Mapped Types
+
+```typescript
+// Make all properties optional
+type Partial<T> = {
+  [P in keyof T]?: T[P];
+};
+
+// Make all properties required
+type Required<T> = {
+  [P in keyof T]-?: T[P];
+};
+
+// Make all properties readonly
+type Readonly<T> = {
+  readonly [P in keyof T]: T[P];
+};
+
+// Create new type with different property types
+type Stringify<T> = {
+  [P in keyof T]: string;
+};
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+type StringifiedUser = Stringify<User>;
+// { id: string; name: string; email: string; }
+```
+
+### Advanced Mapped Types
+
+```typescript
+// Conditional property transformation
+type NullableKeys<T> = {
+  [K in keyof T]: T[K] extends null | undefined ? K : never;
+}[keyof T];
+
+type NonNullableKeys<T> = {
+  [K in keyof T]: T[K] extends null | undefined ? never : K;
+}[keyof T];
+
+interface MixedData {
+  id: number;
+  name: string | null;
+  email?: string;
+  age: number;
+  avatar: string | null;
+}
+
+type NullableFields = NullableKeys<MixedData>; // "name" | "email" | "avatar"
+type NonNullableFields = NonNullableKeys<MixedData>; // "id" | "age"
+
+// Split type into nullable and non-nullable parts
+type SplitNullable<T> = {
+  required: Pick<T, NonNullableKeys<T>>;
+  optional: Pick<T, NullableKeys<T>>;
+};
+
+type SplitUserData = SplitNullable<MixedData>;
+// {
+//   required: { id: number; age: number; };
+//   optional: { name: string | null; email?: string; avatar: string | null; };
+// }
+
+// Deep partial
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+interface NestedUser {
+  id: number;
+  profile: {
+    name: string;
+    address: {
+      street: string;
+      city: string;
+    };
+  };
+}
+
+type PartialNestedUser = DeepPartial<NestedUser>;
+// {
+//   id?: number;
+//   profile?: {
+//     name?: string;
+//     address?: {
+//       street?: string;
+//       city?: string;
+//     };
+//   };
+// }
+```
+
+### Key Remapping in Mapped Types
+
+```typescript
+// Remap keys with template literals
+type Getters<T> = {
+  [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];
+};
+
+type Setters<T> = {
+  [K in keyof T as `set${Capitalize<string & K>}`]: (value: T[K]) => void;
+};
+
+interface Person {
+  name: string;
+  age: number;
+}
+
+type PersonGetters = Getters<Person>;
+// { getName: () => string; getAge: () => number; }
+
+type PersonSetters = Setters<Person>;
+// { setName: (value: string) => void; setAge: (value: number) => void; }
+
+// Combine getters and setters
+type GettersAndSetters<T> = Getters<T> & Setters<T>;
+
+// Filter properties by type
+type FilterByType<T, U> = {
+  [K in keyof T as T[K] extends U ? K : never]: T[K];
+};
+
+interface MixedTypes {
+  id: number;
+  name: string;
+  active: boolean;
+  tags: string[];
+  count: number;
+}
+
+type StringProperties = FilterByType<MixedTypes, string>;
+// { name: string; }
+
+type NumberProperties = FilterByType<MixedTypes, number>;
+// { id: number; count: number; }
+
+// Prefix/suffix keys
+type PrefixKeys<T, P extends string> = {
+  [K in keyof T as `${P}${string & K}`]: T[K];
+};
+
+type SuffixKeys<T, S extends string> = {
+  [K in keyof T as `${string & K}${S}`]: T[K];
+};
+
+type PrefixedPerson = PrefixKeys<Person, 'user_'>;
+// { user_name: string; user_age: number; }
+```
+
+## Utility Type Patterns
+
+### Advanced Utility Types
+
+```typescript
+// Pick properties by value type
+type PickByValueType<T, ValueType> = Pick<
+  T,
+  { [Key in keyof T]: T[Key] extends ValueType ? Key : never }[keyof T]
+>;
+
+interface ApiConfig {
+  baseUrl: string;
+  timeout: number;
+  retries: number;
+  debug: boolean;
+  headers: Record<string, string>;
+}
+
+type StringConfig = PickByValueType<ApiConfig, string>;
+// { baseUrl: string; }
+
+type NumberConfig = PickByValueType<ApiConfig, number>;
+// { timeout: number; retries: number; }
+
+// Exclude properties by value type
+type OmitByValueType<T, ValueType> = Pick<
+  T,
+  { [Key in keyof T]: T[Key] extends ValueType ? never : Key }[keyof T]
+>;
+
+type NonStringConfig = OmitByValueType<ApiConfig, string>;
+// { timeout: number; retries: number; debug: boolean; headers: Record<string, string>; }
+
+// Deep pick - select nested properties
+type DeepPick<T, K extends string> = K extends `${infer K1}.${infer K2}`
+  ? K1 extends keyof T
+    ? { [P in K1]: DeepPick<T[K1], K2> }
+    : never
+  : K extends keyof T
+  ? { [P in K]: T[K] }
+  : never;
+
+interface NestedData {
+  user: {
+    profile: {
+      name: string;
+      email: string;
+    };
+    settings: {
+      theme: string;
+      notifications: boolean;
+    };
+  };
+  posts: Array<{ id: number; title: string; }>;
+}
+
+type UserName = DeepPick<NestedData, 'user.profile.name'>;
+// { user: { profile: { name: string; } } }
+
+// Function overload extraction
+type OverloadedFunction = {
+  (x: string): string;
+  (x: number): number;
+  (x: boolean): boolean;
+};
+
+type ExtractOverloads<T> = T extends {
+  (...args: infer A1): infer R1;
+  (...args: infer A2): infer R2;
+  (...args: infer A3): infer R3;
+} ? [
+  (...args: A1) => R1,
+  (...args: A2) => R2,
+  (...args: A3) => R3
+] : never;
+
+type Overloads = ExtractOverloads<OverloadedFunction>;
+// [
+//   (x: string) => string,
+//   (x: number) => number,
+//   (x: boolean) => boolean
+// ]
+```
+
+## Type-Level Programming
+
+### Arithmetic Operations at Type Level
+
+```typescript
+// Type-level arithmetic using tuple lengths
+type Tuple<T extends number, R extends unknown[] = []> = 
+  R['length'] extends T ? R : Tuple<T, [...R, unknown]>;
+
+type Add<A extends number, B extends number> = [
+  ...Tuple<A>, 
+  ...Tuple<B>
+]['length'];
+
+type Subtract<A extends number, B extends number> = 
+  Tuple<A> extends [...infer U, ...Tuple<B>] ? U['length'] : never;
+
+type Sum = Add<3, 4>; // 7
+type Difference = Subtract<10, 3>; // 7
+
+// Type-level comparisons
+type IsEqual<A, B> = A extends B ? B extends A ? true : false : false;
+type IsNotEqual<A, B> = IsEqual<A, B> extends true ? false : true;
+
+type Equal1 = IsEqual<string, string>; // true
+type Equal2 = IsEqual<string, number>; // false
+
+// Array operations at type level
+type Head<T extends readonly unknown[]> = T extends readonly [infer H, ...unknown[]] ? H : never;
+type Tail<T extends readonly unknown[]> = T extends readonly [unknown, ...infer Rest] ? Rest : [];
+type Length<T extends readonly unknown[]> = T['length'];
+
+type FirstElement = Head<[1, 2, 3, 4]>; // 1
+type RestElements = Tail<[1, 2, 3, 4]>; // [2, 3, 4]
+type ArrayLength = Length<[1, 2, 3, 4]>; // 4
+
+// Reverse array
+type Reverse<T extends readonly unknown[]> = T extends readonly [...infer Rest, infer Last]
+  ? [Last, ...Reverse<Rest>]
+  : [];
+
+type ReversedArray = Reverse<[1, 2, 3, 4]>; // [4, 3, 2, 1]
+
+// Type-level sorting (simplified for numbers)
+type Max<A extends number, B extends number> = 
+  Add<A, 0> extends Add<B, infer Diff> ? B : A;
+
+type Sort2<A extends number, B extends number> = 
+  A extends B ? [A, B] : 
+  Max<A, B> extends A ? [B, A] : [A, B];
+
+type Sorted = Sort2<5, 2>; // [2, 5]
+```
+
+### Advanced Generic Patterns
+
+```typescript
+// Generic constraint inference
+type InferArrayElement<T> = T extends (infer U)[] ? U : never;
+type InferPromiseType<T> = T extends Promise<infer U> ? U : never;
+type InferFunctionReturn<T> = T extends (...args: any[]) => infer R ? R : never;
+
+type ArrayElement = InferArrayElement<string[]>; // string
+type PromiseValue = InferPromiseType<Promise<number>>; // number
+type FunctionReturn = InferFunctionReturn<() => boolean>; // boolean
+
+// Multi-level inference
+type DeepInfer<T> = T extends Promise<infer U>
+  ? U extends (infer V)[]
+    ? V extends (...args: any[]) => infer R
+      ? R
+      : V
+    : U
+  : T;
+
+type ComplexType = DeepInfer<Promise<(() => string)[]>>; // string
+
+// Generic factories with constraints
+interface Identifiable {
+  id: string | number;
+}
+
+type CreateRepository<T extends Identifiable> = {
+  findById(id: T['id']): Promise<T | null>;
+  create(data: Omit<T, 'id'>): Promise<T>;
+  update(id: T['id'], data: Partial<Omit<T, 'id'>>): Promise<T>;
+  delete(id: T['id']): Promise<void>;
+  findMany(query: Partial<T>): Promise<T[]>;
+};
+
+interface User extends Identifiable {
+  id: string;
+  name: string;
+  email: string;
+}
+
+type UserRepository = CreateRepository<User>;
+// {
+//   findById(id: string): Promise<User | null>;
+//   create(data: { name: string; email: string; }): Promise<User>;
+//   update(id: string, data: Partial<{ name: string; email: string; }>): Promise<User>;
+//   delete(id: string): Promise<void>;
+//   findMany(query: Partial<User>): Promise<User[]>;
+// }
+```
+
+## Practical Advanced Patterns
+
+### State Machine Types
+
+```typescript
+// Type-safe state machine
+type StateDefinition = {
+  [state: string]: {
+    [event: string]: string;
+  };
+};
+
+type StateMachine<T extends StateDefinition> = {
+  [State in keyof T]: {
+    state: State;
+    transition<Event extends keyof T[State]>(
+      event: Event
+    ): StateMachine<T>[T[State][Event]];
+    can<Event extends keyof T[State]>(event: Event): boolean;
+    cannot<Event extends keyof T[State]>(event: Event): boolean;
+  };
+};
+
+type OrderStates = {
+  pending: {
+    pay: 'paid';
+    cancel: 'cancelled';
+  };
+  paid: {
+    ship: 'shipped';
+    refund: 'refunded';
+  };
+  shipped: {
+    deliver: 'delivered';
+    return: 'returned';
+  };
+  delivered: {
+    return: 'returned';
+  };
+  cancelled: {};
+  refunded: {};
+  returned: {};
+};
+
+type OrderMachine = StateMachine<OrderStates>;
+
+// Usage would be:
+// const order: OrderMachine['pending'] = ...
+// const paidOrder = order.transition('pay'); // Type is OrderMachine['paid']
+```
+
+### Type-Safe Event System
+
+```typescript
+// Event map definition
+type EventMap = {
+  user:login: { userId: string; timestamp: Date };
+  user:logout: { userId: string };
+  post:created: { postId: string; authorId: string; title: string };
+  post:updated: { postId: string; changes: string[] };
+  system:error: { error: Error; context: string };
+};
+
+// Extract event names
+type EventNames = keyof EventMap;
+
+// Type-safe event emitter
+interface TypeSafeEventEmitter<T extends Record<string, any>> {
+  on<K extends keyof T>(event: K, listener: (data: T[K]) => void): void;
+  off<K extends keyof T>(event: K, listener: (data: T[K]) => void): void;
+  emit<K extends keyof T>(event: K, data: T[K]): void;
+  once<K extends keyof T>(event: K, listener: (data: T[K]) => void): void;
+}
+
+// Event emitter implementation helper
+class EventEmitter<T extends Record<string, any>> implements TypeSafeEventEmitter<T> {
+  private listeners = new Map<keyof T, Set<Function>>();
+
+  on<K extends keyof T>(event: K, listener: (data: T[K]) => void): void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)!.add(listener);
+  }
+
+  off<K extends keyof T>(event: K, listener: (data: T[K]) => void): void {
+    this.listeners.get(event)?.delete(listener);
+  }
+
+  emit<K extends keyof T>(event: K, data: T[K]): void {
+    this.listeners.get(event)?.forEach(listener => listener(data));
+  }
+
+  once<K extends keyof T>(event: K, listener: (data: T[K]) => void): void {
+    const onceListener = (data: T[K]) => {
+      listener(data);
+      this.off(event, onceListener);
+    };
+    this.on(event, onceListener);
+  }
+}
+
+// Usage
+const eventEmitter = new EventEmitter<EventMap>();
+
+eventEmitter.on('user:login', (data) => {
+  // data is typed as { userId: string; timestamp: Date }
+  console.log(`User ${data.userId} logged in at ${data.timestamp}`);
+});
+
+eventEmitter.emit('post:created', {
+  postId: '123',
+  authorId: '456',
+  title: 'New Post'
+  // TypeScript ensures all required properties are present
+});
+```
+
+### Database Query Builder Types
+
+```typescript
+// Table schema definition
+type TableSchema = {
+  [tableName: string]: {
+    [columnName: string]: any;
+  };
+};
+
+type Schema = {
+  users: {
+    id: number;
+    name: string;
+    email: string;
+    created_at: Date;
+  };
+  posts: {
+    id: number;
+    title: string;
+    content: string;
+    author_id: number;
+    published: boolean;
+  };
+  comments: {
+    id: number;
+    post_id: number;
+    author_id: number;
+    content: string;
+  };
+};
+
+// Query builder types
+type SelectQuery<T extends TableSchema, Table extends keyof T> = {
+  select<K extends keyof T[Table]>(...columns: K[]): SelectQuery<T, Table> & {
+    selectedColumns: Pick<T[Table], K>;
+  };
+  where<K extends keyof T[Table]>(
+    column: K,
+    operator: '=' | '!=' | '>' | '<' | '>=' | '<=',
+    value: T[Table][K]
+  ): SelectQuery<T, Table>;
+  join<
+    JoinTable extends keyof T,
+    FK extends keyof T[Table],
+    PK extends keyof T[JoinTable]
+  >(
+    table: JoinTable,
+    foreignKey: FK,
+    primaryKey: PK
+  ): SelectQuery<T, Table | JoinTable>;
+  orderBy<K extends keyof T[Table]>(column: K, direction?: 'ASC' | 'DESC'): SelectQuery<T, Table>;
+  limit(count: number): SelectQuery<T, Table>;
+  execute(): Promise<T[Table][]>;
+};
+
+// Query builder factory
+type QueryBuilder<T extends TableSchema> = {
+  from<Table extends keyof T>(table: Table): SelectQuery<T, Table>;
+};
+
+// Usage example (pseudo-implementation)
+declare const db: QueryBuilder<Schema>;
+
+const query = db
+  .from('users')
+  .select('id', 'name', 'email')
+  .where('created_at', '>', new Date('2023-01-01'))
+  .join('posts', 'id', 'author_id')
+  .orderBy('created_at', 'DESC')
+  .limit(10);
+
+// query.execute() returns Promise<Pick<Schema['users'], 'id' | 'name' | 'email'>[]>
+```
+
+### API Route Type Safety
+
+```typescript
+// API endpoint definitions
+type ApiEndpoints = {
+  'GET /users': {
+    query?: { page?: number; limit?: number; };
+    response: { id: number; name: string; email: string; }[];
+  };
+  'POST /users': {
+    body: { name: string; email: string; };
+    response: { id: number; name: string; email: string; };
+  };
+  'GET /users/:id': {
+    params: { id: string };
+    response: { id: number; name: string; email: string; } | null;
+  };
+  'PUT /users/:id': {
+    params: { id: string };
+    body: { name?: string; email?: string; };
+    response: { id: number; name: string; email: string; };
+  };
+  'DELETE /users/:id': {
+    params: { id: string };
+    response: { success: boolean };
+  };
+};
+
+// Extract method and path from endpoint string
+type ParseEndpoint<T extends string> = T extends `${infer Method} ${infer Path}`
+  ? { method: Method; path: Path }
+  : never;
+
+type EndpointInfo = ParseEndpoint<keyof ApiEndpoints>;
+// { method: "GET" | "POST" | "PUT" | "DELETE"; path: "/users" | "/users/:id" }
+
+// Type-safe API client
+interface ApiClient<T extends Record<string, any>> {
+  request<K extends keyof T>(
+    endpoint: K,
+    options: T[K] extends { params: infer P }
+      ? T[K] extends { body: infer B }
+        ? { params: P; body: B }
+        : T[K] extends { query: infer Q }
+        ? { params: P; query?: Q }
+        : { params: P }
+      : T[K] extends { body: infer B }
+      ? { body: B }
+      : T[K] extends { query: infer Q }
+      ? { query?: Q }
+      : {}
+  ): Promise<T[K] extends { response: infer R } ? R : never>;
+}
+
+// Usage
+declare const apiClient: ApiClient<ApiEndpoints>;
+
+// Type-safe API calls
+const users = await apiClient.request('GET /users', {
+  query: { page: 1, limit: 10 }
+});
+
+const newUser = await apiClient.request('POST /users', {
+  body: { name: 'John Doe', email: 'john@example.com' }
+});
+
+const user = await apiClient.request('GET /users/:id', {
+  params: { id: '123' }
+});
+
+const updatedUser = await apiClient.request('PUT /users/:id', {
+  params: { id: '123' },
+  body: { name: 'Jane Doe' }
+});
+```
+
+## Performance Considerations
+
+### Type-Level Optimization
+
+```typescript
+// Avoid deeply recursive types when possible
+type BadDeepMerge<T, U> = T & U extends object
+  ? { [K in keyof (T & U)]: BadDeepMerge<(T & U)[K], (T & U)[K]> }
+  : T & U;
+
+// Better approach with limited recursion depth
+type DeepMerge<T, U, Depth extends ReadonlyArray<any> = []> = 
+  Depth['length'] extends 10  // Limit recursion depth
+    ? T & U
+    : T extends object
+    ? U extends object
+      ? { [K in keyof (T & U)]: 
+          K extends keyof T
+            ? K extends keyof U
+              ? DeepMerge<T[K], U[K], [...Depth, any]>
+              : T[K]
+            : K extends keyof U
+            ? U[K]
+            : never
+        }
+      : T
+    : U;
+
+// Use distributive conditional types efficiently
+type EfficientFilter<T, U> = T extends U ? T : never;
+
+// Cache complex type computations
+type _ComputedTypeCache = {
+  [K: string]: any;
+};
+
+// Use branded types for nominal typing
+type Brand<T, B> = T & { __brand: B };
+type UserId = Brand<string, 'UserId'>;
+type PostId = Brand<string, 'PostId'>;
+
+function createUser(id: UserId, name: string): void {
+  // Only accepts branded UserId, not plain string
+}
+
+// Type assertion helpers
+type Assert<T extends true> = T;
+type Equals<X, Y> = (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? true : false;
+
+// Compile-time assertions
+type TestUserIdIsString = Assert<Equals<UserId, string>>; // Error: false is not assignable to true
+```
+
+## Testing Types
+
+### Type Testing Utilities
+
+```typescript
+// Type testing utilities
+type Expect<T extends true> = T;
+type ExpectTrue<T extends true> = T;
+type ExpectFalse<T extends false> = T;
+type IsTrue<T extends true> = T;
+type IsFalse<T extends false> = T;
+
+type Equal<X, Y> = 
+  (<T>() => T extends X ? 1 : 2) extends 
+  (<T>() => T extends Y ? 1 : 2) ? true : false;
+
+type NotEqual<X, Y> = Equal<X, Y> extends true ? false : true;
+
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type IsNever<T> = [T] extends [never] ? true : false;
+type IsUnknown<T> = IsAny<T> extends true ? false : unknown extends T ? true : false;
+
+// Type tests
+type TestCases = [
+  // Test basic equality
+  Expect<Equal<string, string>>,
+  Expect<NotEqual<string, number>>,
+  
+  // Test utility types
+  Expect<Equal<Partial<{ a: string; b: number }>, { a?: string; b?: number }>>,
+  Expect<Equal<Required<{ a?: string; b?: number }>, { a: string; b: number }>>,
+  
+  // Test complex types
+  Expect<Equal<
+    ReturnType<() => Promise<string>>,
+    Promise<string>
+  >>,
+  
+  // Test special types
+  Expect<IsNever<never>>,
+  Expect<IsAny<any>>,
+  Expect<IsUnknown<unknown>>,
+];
+
+// Runtime type testing function
+function testType<T>(): T {
+  return null as any;
+}
+
+// Usage in tests
+const userType = testType<User>();
+const partialUserType = testType<Partial<User>>();
+
+// Ensure types are as expected
+type _Test1 = Expect<Equal<typeof userType, User>>;
+type _Test2 = Expect<Equal<typeof partialUserType, Partial<User>>>;
+```
+
+## Best Practices and Patterns
+
+### Type Organization
+
+```typescript
+// Namespace organization for large type definitions
+namespace Database {
+  export namespace Schema {
+    export interface User {
+      id: number;
+      name: string;
+      email: string;
+    }
+    
+    export interface Post {
+      id: number;
+      title: string;
+      content: string;
+      authorId: number;
+    }
+  }
+  
+  export namespace Operations {
+    export type Create<T> = Omit<T, 'id'>;
+    export type Update<T> = Partial<Omit<T, 'id'>>;
+    export type Delete = { id: number };
+  }
+  
+  export type Repository<T> = {
+    create(data: Operations.Create<T>): Promise<T>;
+    update(id: number, data: Operations.Update<T>): Promise<T>;
+    delete(id: number): Promise<void>;
+    findById(id: number): Promise<T | null>;
+  };
+}
+
+// Use const assertions for immutable data structures
+const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const;
+type HttpMethod = typeof HTTP_METHODS[number]; // 'GET' | 'POST' | 'PUT' | 'DELETE'
+
+const API_ENDPOINTS = {
+  USERS: '/api/users',
+  POSTS: '/api/posts',
+  COMMENTS: '/api/comments'
+} as const;
+type ApiEndpoint = typeof API_ENDPOINTS[keyof typeof API_ENDPOINTS];
+
+// Type-driven development pattern
+interface FeatureConfig {
+  name: string;
+  enabled: boolean;
+  settings: Record<string, any>;
+}
+
+type FeatureFlags = {
+  [K in string]: FeatureConfig;
+};
+
+// Generate implementation from types
+type ImplementFeature<T extends FeatureFlags> = {
+  [K in keyof T]: {
+    isEnabled(): boolean;
+    getName(): string;
+    getSettings(): T[K]['settings'];
+    configure(settings: Partial<T[K]['settings']>): void;
+  };
+};
+
+// Documentation through types
+/**
+ * Represents a paginated API response
+ * @template T The type of items in the data array
+ */
+interface PaginatedResponse<T> {
+  /** The current page items */
+  data: T[];
+  /** Pagination metadata */
+  pagination: {
+    /** Current page number (1-based) */
+    page: number;
+    /** Number of items per page */
+    limit: number;
+    /** Total number of items across all pages */
+    total: number;
+    /** Total number of pages */
+    totalPages: number;
+    /** Whether there are more pages after the current one */
+    hasNext: boolean;
+    /** Whether there are pages before the current one */
+    hasPrev: boolean;
+  };
+}
+```
+
+## Conclusion
+
+Advanced TypeScript patterns enable powerful type-level programming that can significantly improve code quality, developer experience, and runtime safety. Key takeaways:
+
+**Core Techniques:**
+- **Conditional types** enable type logic and branching
+- **Template literal types** provide string manipulation at compile time
+- **Mapped types** transform existing types systematically
+- **Type-level programming** enables complex computations in the type system
+
+**Advanced Applications:**
+- ✅ **API type safety** - Ensure request/response contracts are maintained
+- ✅ **State machines** - Model complex state transitions safely
+- ✅ **Query builders** - Provide type-safe database interactions
+- ✅ **Event systems** - Create fully typed pub/sub mechanisms
+
+**Best Practices:**
+- **Start simple** - Add complexity gradually as needed
+- **Test your types** - Use type testing utilities to validate behavior
+- **Document complex types** - Use comments and examples
+- **Consider performance** - Avoid deeply recursive types when possible
+- **Organize thoughtfully** - Use namespaces and modules for large type systems
+
+**When to Use Advanced Patterns:**
+- Building libraries and frameworks
+- Creating type-safe APIs
+- Modeling complex domain logic
+- Improving developer experience
+- Preventing runtime errors through compile-time guarantees
+
+Advanced TypeScript patterns require practice to master, but they provide immense value in creating robust, maintainable, and self-documenting code. Start with simpler patterns and gradually incorporate more advanced techniques as your understanding grows.
+
+Remember: the goal is not to show off complex type gymnastics, but to create better, more reliable software through the power of TypeScript's type system.
