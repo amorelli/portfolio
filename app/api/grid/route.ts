@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { gridOperations, ensureInitialized, type GridSquare } from '../../lib/blob-storage';
+import { gridOperations, ensureInitialized, type GridSquare } from '../../lib/postgres-storage';
 import { isValidCoordinate } from '../../lib/grid-utils';
 
 // Add comprehensive logging for debugging

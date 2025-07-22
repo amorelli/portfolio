@@ -46,10 +46,23 @@ function createEmptyGrid(): GridData {
   };
 }
 
+// Custom error class for ETag conflicts
+class BlobConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BlobConflictError';
+  }
+}
+
 // Blob storage operations with ETag-based concurrency
 class GridBlobStorage {
   private blobUrl: string | null = null;
   private lastETag: string | null = null;
+  private updateQueue: Promise<any> = Promise.resolve();
+  
+  // Configuration for retry mechanism
+  private readonly MAX_RETRIES = 5;
+  private readonly BASE_DELAY_MS = 100;
 
   // Get the current blob URL from environment or construct it
   private getBlobUrl(): string {
@@ -64,6 +77,20 @@ class GridBlobStorage {
       this.blobUrl = `https://blob.vercel-storage.com/${BLOB_FILENAME}`;
     }
     return this.blobUrl;
+  }
+
+  // Get current ETag by making a HEAD request
+  private async getCurrentETag(): Promise<string | null> {
+    try {
+      const response = await fetch(this.getBlobUrl(), { method: 'HEAD' });
+      if (!response.ok) {
+        return null;
+      }
+      return response.headers.get('etag');
+    } catch (error) {
+      console.warn('Error getting current ETag:', error);
+      return null;
+    }
   }
 
   // Load grid data from blob storage with ETag support
@@ -97,8 +124,8 @@ class GridBlobStorage {
     }
   }
 
-  // Save grid data to blob storage with ETag-based concurrency
-  private async saveGridData(data: GridData): Promise<void> {
+  // Save grid data to blob storage with ETag-based concurrency and conditional writes
+  private async saveGridDataWithConditionalWrite(data: GridData, expectedETag: string | null): Promise<void> {
     try {
       data.lastUpdated = new Date().toISOString();
       data.metadata.coloredSquares = Object.keys(data.grid).length;
@@ -106,7 +133,67 @@ class GridBlobStorage {
       const jsonData = JSON.stringify(data, null, 2);
       const blob = new Blob([jsonData], { type: 'application/json' });
 
+      // For conditional writes, we need to check the current ETag before writing
+      if (expectedETag) {
+        // Check if the blob has been modified since we last read it
+        const currentETag = await this.getCurrentETag();
+        
+        if (currentETag && currentETag !== expectedETag) {
+          throw new BlobConflictError(`ETag mismatch: expected ${expectedETag}, got ${currentETag}`);
+        }
+      }
+
       // Upload to blob storage
+      const result = await put(BLOB_FILENAME, blob, {
+        access: 'public',
+        allowOverwrite: true
+      });
+
+      this.blobUrl = result.url;
+      this.lastETag = null; // Reset ETag since we just wrote new data
+      console.log(`Grid data saved to blob: ${result.url}`);
+    } catch (error) {
+      if (error instanceof BlobConflictError) {
+        throw error; // Re-throw conflict errors for retry logic
+      }
+      console.error('Error saving grid data:', error);
+      throw new Error('Failed to save grid data to blob storage');
+    }
+  }
+
+  // Utility method to implement exponential backoff retry logic
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    retryCount: number = 0
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (error instanceof BlobConflictError && retryCount < this.MAX_RETRIES) {
+        const delay = this.BASE_DELAY_MS * Math.pow(2, retryCount) + Math.random() * 100;
+        console.log(`Conflict detected, retrying in ${delay}ms (attempt ${retryCount + 1}/${this.MAX_RETRIES})`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.retryWithBackoff(operation, retryCount + 1);
+      }
+      throw error;
+    }
+  }
+
+  // Save grid data with fallback to basic save for compatibility
+  private async saveGridData(data: GridData, expectedETag?: string | null): Promise<void> {
+    if (expectedETag !== undefined) {
+      return this.saveGridDataWithConditionalWrite(data, expectedETag);
+    }
+    
+    // Fallback for compatibility - basic save without ETag checking
+    try {
+      data.lastUpdated = new Date().toISOString();
+      data.metadata.coloredSquares = Object.keys(data.grid).length;
+
+      const jsonData = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonData], { type: 'application/json' });
+
       const result = await put(BLOB_FILENAME, blob, {
         access: 'public',
         allowOverwrite: true
@@ -168,63 +255,60 @@ class GridBlobStorage {
   }
 
   async updateSquare(x: number, y: number, color: string): Promise<GridSquare> {
-    try {
-      const { data } = await this.loadGridData();
-      const key = coordinateToKey(x, y);
-      const timestamp = new Date().toISOString();
-      
-      // Update the square
-      data.grid[key] = {
-        color,
-        updated_at: timestamp
-      };
-      
-      // Save back to blob storage
-      await this.saveGridData(data);
-      
-      return {
-        x,
-        y,
-        color,
-        updated_at: timestamp
-      };
-    } catch (error) {
-      console.error('Error updating square:', error);
-      throw error;
-    }
+    return this.updateQueue = this.updateQueue.then(async () => {
+      return this.retryWithBackoff(async () => {
+        const { data, etag } = await this.loadGridData();
+        const key = coordinateToKey(x, y);
+        const timestamp = new Date().toISOString();
+        
+        // Update the square
+        data.grid[key] = {
+          color,
+          updated_at: timestamp
+        };
+        
+        // Save back to blob storage with conditional write
+        await this.saveGridData(data, etag);
+        
+        return {
+          x,
+          y,
+          color,
+          updated_at: timestamp
+        };
+      });
+    });
   }
 
   async deleteSquare(x: number, y: number): Promise<boolean> {
-    try {
-      const { data } = await this.loadGridData();
-      const key = coordinateToKey(x, y);
-      
-      if (!data.grid[key]) {
-        return false;
-      }
-      
-      delete data.grid[key];
-      await this.saveGridData(data);
-      return true;
-    } catch (error) {
-      console.error('Error deleting square:', error);
-      throw error;
-    }
+    return this.updateQueue = this.updateQueue.then(async () => {
+      return this.retryWithBackoff(async () => {
+        const { data, etag } = await this.loadGridData();
+        const key = coordinateToKey(x, y);
+        
+        if (!data.grid[key]) {
+          return false;
+        }
+        
+        delete data.grid[key];
+        await this.saveGridData(data, etag);
+        return true;
+      });
+    });
   }
 
   async clearAllSquares(): Promise<number> {
-    try {
-      const { data } = await this.loadGridData();
-      const deletedCount = Object.keys(data.grid).length;
-      
-      data.grid = {};
-      await this.saveGridData(data);
-      
-      return deletedCount;
-    } catch (error) {
-      console.error('Error clearing all squares:', error);
-      throw error;
-    }
+    return this.updateQueue = this.updateQueue.then(async () => {
+      return this.retryWithBackoff(async () => {
+        const { data, etag } = await this.loadGridData();
+        const deletedCount = Object.keys(data.grid).length;
+        
+        data.grid = {};
+        await this.saveGridData(data, etag);
+        
+        return deletedCount;
+      });
+    });
   }
 
   async getSquareCount(): Promise<number> {
