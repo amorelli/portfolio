@@ -9,6 +9,9 @@ const navItems = {
   },
   '/grid': {
     name: 'grid',
+  },
+  '/letters': {
+    name: 'letters',
   }
 }
 
