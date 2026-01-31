@@ -53,15 +53,15 @@ export default function RootLayout({
         GeistMono.variable
       )}
     >
-      <body className="antialiased max-w-4xl lg:mx-auto">
+      <body className="antialiased max-w-4xl lg:mx-auto min-h-screen flex flex-col">
         <GoogleAnalytics gaId="G-CGTTNSTVQ9" />
-        <main className="flex-auto min-w-0 mt-6 flex flex-col px-2 md:px-0">
+        <main className="flex-1 min-w-0 mt-6 flex flex-col px-2 md:px-0">
           <Navbar />
           {children}
-          <Footer />
-          <Analytics />
-          <SpeedInsights />
         </main>
+        <Footer />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

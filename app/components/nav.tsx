@@ -12,7 +12,10 @@ const navItems = {
   },
   '/letters': {
     name: 'letters',
-  }
+  },
+  '/cube': {
+    name: 'cube',
+  },
 }
 
 export function Navbar() {
