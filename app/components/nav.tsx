@@ -7,17 +7,8 @@ const navItems = {
   '/blog': {
     name: 'blog',
   },
-  '/grid': {
-    name: 'grid',
-  },
-  '/letters': {
-    name: 'letters',
-  },
-  '/cube': {
-    name: 'cube',
-  },
-  '/game': {
-    name: 'game',
+  '/toys': {
+    name: 'toys',
   },
 }
 

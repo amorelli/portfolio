@@ -16,9 +16,9 @@ const MAP = [
 ]
 
 const SPAWN = {
-  x: 3.65,
-  y: 5.26,
-  angle: -0.71,
+  x: 10.79,
+  y: 5.79,
+  angle: -2.34,
 }
 
 const SPRITES = [
@@ -622,11 +622,11 @@ export default function CubePage() {
         }
       }
 
-    //   if (debugRef.current && time - lastDebugUpdate > 120) {
-    //     lastDebugUpdate = time
-    //     const angle = Math.atan2(player.dir.y, player.dir.x)
-    //     debugRef.current.textContent = `pos: ${player.pos.x.toFixed(2)}, ${player.pos.y.toFixed(2)} | angle: ${angle.toFixed(2)} rad`
-    //   }
+      if (debugRef.current && time - lastDebugUpdate > 120) {
+        lastDebugUpdate = time
+        const angle = Math.atan2(player.dir.y, player.dir.x)
+        debugRef.current.textContent = `pos: ${player.pos.x.toFixed(2)}, ${player.pos.y.toFixed(2)} | angle: ${angle.toFixed(2)} rad`
+      }
 
       animationFrame = window.requestAnimationFrame(render)
     }
