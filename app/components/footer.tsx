@@ -1,3 +1,7 @@
+'use client'
+
+import { usePathname } from 'next/navigation'
+
 function ArrowIcon() {
   return (
     <svg
@@ -16,8 +20,10 @@ function ArrowIcon() {
 }
 
 export default function Footer() {
+  const pathname = usePathname()
+  const isFixed = pathname === '/cube' || pathname === '/game'
   return (
-    <footer className="absolute bottom-0 z-10 mt-8 pb-8">
+    <footer className={`${isFixed ? 'absolute bottom-0 z-10' : 'relative'} mt-8 pb-8`}>
       <ul className="font-sm mt-8 flex flex-col space-x-0 space-y-2 text-neutral-600 md:flex-row md:space-x-4 md:space-y-0 dark:text-neutral-300">
         <li>
           <a
