@@ -17,7 +17,7 @@ function ArrowIcon() {
 
 export default function Footer() {
   return (
-    <footer className="mt-8 pb-8">
+    <footer className="absolute bottom-0 z-10 mt-8 pb-8">
       <ul className="font-sm mt-8 flex flex-col space-x-0 space-y-2 text-neutral-600 md:flex-row md:space-x-4 md:space-y-0 dark:text-neutral-300">
         <li>
           <a
@@ -36,7 +36,7 @@ export default function Footer() {
             rel="noopener noreferrer"
             target="_blank"
             // href="https://github.com/amorelli"
-            href='#'
+            href="#"
           >
             <ArrowIcon />
             <p className="ml-2 h-7">GitHub</p>
@@ -48,7 +48,7 @@ export default function Footer() {
             rel="noopener noreferrer"
             target="_blank"
             // href="https://www.linkedin.com/in/adam-david-morelli/"
-            href='#'
+            href="#"
           >
             <ArrowIcon />
             <p className="ml-2 h-7">LinkedIn</p>

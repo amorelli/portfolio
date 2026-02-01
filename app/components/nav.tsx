@@ -16,11 +16,14 @@ const navItems = {
   '/cube': {
     name: 'cube',
   },
+  '/game': {
+    name: 'game',
+  },
 }
 
 export function Navbar() {
   return (
-    <header className="mb-16 tracking-tight">
+    <header className="relative z-10 mb-16 tracking-tight">
       <div className="lg:sticky lg:top-20">
         <div className="container flex flex-col items-start justify-between mx-auto md:flex-row md:items-center">
           <a className="text-lg font-bold text-neutral-900 dark:text-neutral-100" href="/">Adam</a>
