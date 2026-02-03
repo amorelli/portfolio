@@ -466,11 +466,14 @@ export default function CubePage() {
           ? (mapX - player.pos.x + (1 - stepX) / 2) / rayDirX
           : (mapY - player.pos.y + (1 - stepY) / 2) / rayDirY
 
-        const lineHeight = Math.floor(height / Math.max(0.0001, perpWallDist))
-        let drawStart = -lineHeight / 2 + height / 2
-        let drawEnd = lineHeight / 2 + height / 2
-        drawStart = Math.max(0, drawStart)
-        drawEnd = Math.min(height - 1, drawEnd)
+        const safePerpWallDist = Math.max(0.0001, perpWallDist)
+        const lineHeight = Math.max(1, Math.floor(height / safePerpWallDist))
+        const wallStart = -lineHeight / 2 + height / 2
+        const wallEnd = lineHeight / 2 + height / 2
+        const drawStart = Math.max(0, Math.floor(wallStart))
+        const drawEnd = Math.min(height - 1, Math.floor(wallEnd))
+        if (drawEnd < drawStart) continue
+        const drawHeight = drawEnd - drawStart + 1
 
         const hitType = wallTypeAt(mapX, mapY)
         const texture = textures[hitType] || textures['1']
@@ -486,24 +489,29 @@ export default function CubePage() {
         if (side === 0 && rayDirX < 0) texX = textureSize - texX - 1
         if (side === 1 && rayDirY > 0) texX = textureSize - texX - 1
 
+        const texStart = Math.floor(((drawStart - wallStart) / lineHeight) * textureSize)
+        const texHeight = Math.floor((drawHeight / lineHeight) * textureSize)
+        const srcY = Math.max(0, Math.min(textureSize - 1, texStart))
+        const srcHeight = Math.max(1, Math.min(textureSize - srcY, texHeight))
+
         ctx.drawImage(
           texture,
           texX,
-          0,
+          srcY,
           1,
-          textureSize,
+          srcHeight,
           x,
           drawStart,
           1,
-          drawEnd - drawStart
+          drawHeight
         )
 
-        const distanceFade = 1 / (1 + perpWallDist * perpWallDist * 0.15)
+        const distanceFade = 1 / (1 + safePerpWallDist * safePerpWallDist * 0.15)
         const sideShade = side === 1 ? 0.7 : 1
         ctx.fillStyle = `rgba(0, 0, 0, ${1 - distanceFade * sideShade})`
-        ctx.fillRect(x, drawStart, 1, drawEnd - drawStart)
+        ctx.fillRect(x, drawStart, 1, drawHeight)
 
-        zBuffer[x] = perpWallDist
+        zBuffer[x] = safePerpWallDist
       }
 
       // Billboard sprites rendered in world space with z-buffer occlusion.

@@ -1,6 +1,11 @@
 import Link from 'next/link'
 
-const toys = [
+const projects = [
+  {
+    title: 'Game',
+    href: '/game',
+    description: 'Retro-inspired raycasting shooter experiment.',
+  },
   {
     title: 'Cube',
     href: '/cube',
@@ -18,27 +23,27 @@ const toys = [
   },
 ]
 
-export default function ToysPage() {
+export default function LabPage() {
   return (
     <section className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Toys</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Lab</h1>
         <p className="text-neutral-700 dark:text-neutral-300">
           A dashboard of creative experiments and interactive sketches.
         </p>
       </header>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {toys.map((toy) => (
+        {projects.map((project) => (
           <Link
-            key={toy.href}
-            href={toy.href}
+            key={project.href}
+            href={project.href}
             className="group rounded-2xl border border-neutral-200/60 bg-white/80 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md dark:border-neutral-800/70 dark:bg-neutral-950/70"
           >
             <div className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-              {toy.title}
+              {project.title}
             </div>
             <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">
-              {toy.description}
+              {project.description}
             </p>
             <div className="mt-4 text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
               Open
