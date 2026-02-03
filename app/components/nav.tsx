@@ -10,6 +10,9 @@ const navItems = {
   '/toys': {
     name: 'toys',
   },
+  '/cv': {
+    name: 'cv',
+  },
 }
 
 export function Navbar() {
