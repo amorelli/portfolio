@@ -5,28 +5,8 @@ export const metadata: Metadata = {
   description: 'Curriculum vitae for Adam Morelli.',
 }
 
-const skills = [
-  {
-    label: 'Languages & Frameworks',
-    value: 'JavaScript/TypeScript, PHP, Python, React, Laravel, Node.js',
-  },
-  {
-    label: 'Backend & Data',
-    value: 'REST, GraphQL, MySQL, relational and NoSQL databases',
-  },
-  {
-    label: 'Frontend',
-    value: 'React, Next.js, CSS/SASS, performance optimization, accessibility (WCAG)',
-  },
-  {
-    label: 'DevOps & Infra',
-    value: 'AWS, Docker, CI/CD, Git, monitoring, load testing (Grafana k6)',
-  },
-  {
-    label: 'Testing',
-    value: 'Jest, Playwright, Selenium, PHPUnit, TestCafe, TDD, visual regression testing',
-  },
-]
+const skills =
+  'JavaScript/TypeScript, Laravel PHP, React, Next.js, Node.js, REST and GraphQL APIs, MySQL, relational and NoSQL databases, AWS, Docker, Jenkins, Jest, Playwright, Selenium, PHPUnit, Accessibility (WCAG)'
 
 const experience = [
   {
@@ -35,10 +15,11 @@ const experience = [
     location: 'Durham, NC',
     period: '2021 - Present',
     bullets: [
-      'Designed and implemented scalable full-stack solutions using React, Laravel, GraphQL, MySQL, automated testing, and AWS.',
-      'Led development of the organization\'s flagship application, contributing to architecture, implementation planning, and long-term maintenance.',
-      'Consolidated application services and infrastructure, reducing operational costs by nearly 50% in under one year.',
-      'Built internal tools supporting research and development workflows, including a transcription service, resource platform, report builder, and time-tracking app.',
+      'Designed and implemented scalable production systems across frontend, backend, and infrastructure using React, Laravel, GraphQL, MySQL, and AWS.',
+      'Contributed to system architecture and led development of the organization\'s flagship application from planning through ongoing iteration.',
+      'Improved operational efficiency by consolidating infrastructure, reducing costs by nearly 50% in under one year.',
+      'Built internal platforms and tools to support engineering and research workflows, including data processing, reporting, and automation tools.',
+      'Collaborated with cross-functional teams and stakeholders to refine requirements, deliver features, and support production systems.',
     ],
   },
   {
@@ -47,9 +28,9 @@ const experience = [
     location: 'Durham, NC',
     period: '2019 - 2021',
     bullets: [
-      'Built responsive web applications with React and REST APIs backed by Laravel.',
-      'Maintained and customized 20+ WordPress sites, improving analytics visibility and performance.',
-      'Partnered with designers and product teams to translate requirements into user-focused applications.',
+      'Developed and maintained production web applications using React and Laravel.',
+      'Supported multiple customer-facing and internal systems, contributing to feature development, performance improvements, and bug fixes.',
+      'Worked closely with designers and product teams to translate requirements into functional software.',
     ],
   },
 ]
@@ -100,14 +81,7 @@ export default function CvPage() {
         <h2 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
           Skills
         </h2>
-        <div className="space-y-3">
-          {skills.map((skill) => (
-            <p key={skill.label} className="text-neutral-700 dark:text-neutral-300">
-              <span className="font-medium text-neutral-900 dark:text-neutral-100">{skill.label}:</span>{' '}
-              {skill.value}
-            </p>
-          ))}
-        </div>
+        <p className="text-neutral-700 dark:text-neutral-300">{skills}</p>
       </section>
 
       <section className="space-y-5">

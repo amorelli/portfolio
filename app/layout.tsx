@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
     default: 'Adam',
-    template: '%s | Software',
+    template: '%s | Adam',
   },
   description: 'Adam.',
   openGraph: {
