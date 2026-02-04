@@ -26,14 +26,16 @@ export default function CubePage() {
     let floorBuffer: HTMLCanvasElement | null = null
     let floorCtx: CanvasRenderingContext2D | null = null
     let floorImageData: ImageData | null = null
-    const enemyMaxHealth = 2
+    const enemyMinHealth = 2
+    const enemyMaxHealth = 3
     const enemyRespawnMs = 3000
     const enemyKnockbackDistance = 0.42
     const enemyHitStunMs = 220
-    const enemyStates: EnemyRuntime[] = ENEMIES.map((enemy) => {
+    const enemyStates: EnemyRuntime[] = ENEMIES.map((enemy, index) => {
       const phase = ((enemy.phase % 2) + 2) % 2
       const patrolDir: 1 | -1 = phase <= 1 ? 1 : -1
       const patrolT = phase <= 1 ? phase : 2 - phase
+      const maxHealth = enemyMinHealth + (index % (enemyMaxHealth - enemyMinHealth + 1))
       return {
         pos: {
           x: enemy.base.x + enemy.patrol.x * patrolT,
@@ -45,7 +47,8 @@ export default function CubePage() {
         hitStunUntil: 0,
         deadUntil: 0,
         lastDamageAt: -99999,
-        health: enemyMaxHealth,
+        maxHealth,
+        health: maxHealth,
         animTime: 0,
       }
     })
@@ -200,6 +203,21 @@ export default function CubePage() {
       player.dir.y = spawnDirY
       player.plane.x = -spawnDirY * 0.66
       player.plane.y = spawnDirX * 0.66
+      for (let i = 0; i < ENEMIES.length; i++) {
+        const enemyDef = ENEMIES[i]
+        const enemy = enemyStates[i]
+        const phase = ((enemyDef.phase % 2) + 2) % 2
+        enemy.patrolDir = phase <= 1 ? 1 : -1
+        enemy.patrolT = phase <= 1 ? phase : 2 - phase
+        enemy.pos.x = enemyDef.base.x + enemyDef.patrol.x * enemy.patrolT
+        enemy.pos.y = enemyDef.base.y + enemyDef.patrol.y * enemy.patrolT
+        enemy.chaseUntil = 0
+        enemy.hitStunUntil = 0
+        enemy.deadUntil = 0
+        enemy.lastDamageAt = -99999
+        enemy.health = enemy.maxHealth
+        enemy.animTime = 0
+      }
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -483,7 +501,9 @@ export default function CubePage() {
         resetPlayer(time)
       }
       if (playerDeadUntil <= time) {
-        updateEnemies(time, dt)
+        if (pointerLocked) {
+          updateEnemies(time, dt)
+        }
         resolvePlayerEnemyCollision(time)
       }
 
@@ -701,9 +721,11 @@ export default function CubePage() {
         const drawStartX = Math.floor(spriteScreenX - clampedWidth / 2)
         const drawEndX = Math.floor(spriteScreenX + clampedWidth / 2)
 
+        let enemyVisible = false
         for (let stripe = drawStartX; stripe < drawEndX; stripe++) {
           if (stripe < 0 || stripe >= widthInt) continue
           if (transformY >= zBuffer[stripe]) continue
+          enemyVisible = true
           const texX = Math.floor(((stripe - drawStartX) / clampedWidth) * tex.width)
           ctx.drawImage(
             tex,
@@ -717,6 +739,19 @@ export default function CubePage() {
             drawEndY - drawStartY
           )
         }
+
+        if (!enemyVisible) continue
+
+        const enemy = enemyStates[entry.index]
+        const healthRatio = Math.max(0, Math.min(1, enemy.health / enemy.maxHealth))
+        const barWidth = Math.max(14, Math.min(30, Math.floor(clampedWidth * 0.45)))
+        const barHeight = 4
+        const barX = Math.floor(spriteScreenX - barWidth / 2)
+        const barY = Math.max(2, drawStartY - 8)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'
+        ctx.fillRect(barX, barY, barWidth, barHeight)
+        ctx.fillStyle = 'rgba(255, 90, 70, 0.95)'
+        ctx.fillRect(barX + 1, barY + 1, Math.max(0, Math.floor((barWidth - 2) * healthRatio)), barHeight - 2)
       }
 
       // Projectile flash + moving tracer + hit marker.
@@ -776,7 +811,7 @@ export default function CubePage() {
                 enemy.hitStunUntil = 0
                 enemy.patrolT = 0
                 enemy.patrolDir = 1
-                enemy.health = enemyMaxHealth
+                enemy.health = enemy.maxHealth
                 enemy.pos = { x: ENEMIES[enemyIndex].base.x, y: ENEMIES[enemyIndex].base.y }
               }
             }

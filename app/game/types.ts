@@ -15,6 +15,7 @@ export type EnemyRuntime = {
   hitStunUntil: number
   deadUntil: number
   lastDamageAt: number
+  maxHealth: number
   health: number
   animTime: number
 }
