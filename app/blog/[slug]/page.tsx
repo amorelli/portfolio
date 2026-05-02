@@ -11,7 +11,8 @@ export async function generateStaticParams() {
   })).filter(item => item.slug) // Filter out any undefined slugs
 }
 
-export function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   let post = getBlogPosts().find((post) => post.slug === params.slug)
   if (!post) {
     return
@@ -51,7 +52,8 @@ export function generateMetadata({ params }: { params: { slug: string } }) {
   }
 }
 
-export default function Blog({ params }: { params: { slug: string } }) {
+export default async function Blog(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   let post = getBlogPosts().find((post) => post.slug === params.slug)
 
   if (!post) {
