@@ -1,1 +1,1 @@
-export { default } from './game/page'
+export { default } from './cv/page'
